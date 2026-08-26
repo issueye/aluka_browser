@@ -319,6 +319,33 @@ func (m *Manager) Eval(script string) {
 	})
 }
 
+// SetVisible 控制当前活跃标签页的渲染视图显隐（进入全屏设置页时隐藏原生子窗口）。
+func (m *Manager) SetVisible(visible bool) {
+	m.dispatch(func() {
+		m.mu.Lock()
+		view := m.views[m.activeTabID]
+		bounds := m.lastBounds
+		m.mu.Unlock()
+
+		if view == nil || view.childHWND == 0 {
+			return
+		}
+		if visible {
+			win32.Show(view.childHWND)
+			m.setBoundsLocked(view, bounds)
+			if view.Chromium != nil {
+				_ = view.Chromium.Show()
+				view.Chromium.Focus()
+			}
+		} else {
+			win32.Hide(view.childHWND)
+			if view.Chromium != nil {
+				_ = view.Chromium.Hide()
+			}
+		}
+	})
+}
+
 // webViewMessage 与注入脚本 postMessage 的 JSON 结构对应。
 type webViewMessage struct {
 	Type  string `json:"type"`

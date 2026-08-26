@@ -11,9 +11,17 @@ func (u *UI) LayoutQuickBar(gtx layout.Context) layout.Dimensions {
 	var children []layout.FlexChild
 
 	children = append(children, layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-		lbl := material.Label(u.theme, unit.Sp(12), "★ 快捷访问: ")
-		lbl.Color = CTabInactiveText
-		return lbl.Layout(gtx)
+		return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return glyph(gtx, iconBookmark, 13, CTabInactiveText)
+			}),
+			layout.Rigid(spacer(4)),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				lbl := material.Label(u.theme, unit.Sp(12), "快捷访问: ")
+				lbl.Color = CTabInactiveText
+				return lbl.Layout(gtx)
+			}),
+		)
 	}))
 
 	for _, bm := range u.bmCtls {

@@ -38,17 +38,19 @@ type Engine interface {
 	GoForward()
 	Reload()
 	FocusContent()
+	SetVisible(visible bool)
 }
 
 // Browser 浏览器状态机。
 type Browser struct {
-	mu       sync.Mutex
-	engine   Engine
-	tabs     []*Tab
-	active   int
-	status   string
-	loading  bool
-	bookmark []Bookmark
+	mu           sync.Mutex
+	engine       Engine
+	tabs         []*Tab
+	active       int
+	status       string
+	loading      bool
+	bookmark     []Bookmark
+	settingsOpen bool
 }
 
 // New 创建浏览器并置入一个默认标签页。engine 允许为 nil（用于测试）。
@@ -295,3 +297,23 @@ func (b *Browser) SetPageLoading(loading bool, url string) {
 		b.status = "就绪 · " + url
 	}
 }
+
+// SettingsOpen 返回当前是否正处于设置页面。
+func (b *Browser) SettingsOpen() bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.settingsOpen
+}
+
+// SetSettingsOpen 设置是否打开设置页，并联动通知引擎显隐。
+func (b *Browser) SetSettingsOpen(open bool) {
+	b.mu.Lock()
+	b.settingsOpen = open
+	engine := b.engine
+	b.mu.Unlock()
+
+	if engine != nil {
+		engine.SetVisible(!open)
+	}
+}
+

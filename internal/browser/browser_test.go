@@ -22,6 +22,7 @@ func (s *stubEngine) GoBack()                     { s.others++ }
 func (s *stubEngine) GoForward()                  { s.others++ }
 func (s *stubEngine) Reload()                     { s.others++ }
 func (s *stubEngine) FocusContent()               { s.others++ }
+func (s *stubEngine) SetVisible(visible bool)     { s.others++ }
 
 func TestNormalizeInputURL(t *testing.T) {
 	cases := []struct{ in, want string }{
@@ -116,3 +117,26 @@ func TestUpdateTabState(t *testing.T) {
 	// 未知名应安全忽略且不 panic
 	b.UpdateTabState(fmt.Sprintf("tab-%d-unknown", 12345), "https://x.io", "X")
 }
+
+func TestSettingsOpen(t *testing.T) {
+	e := &stubEngine{}
+	b := New(e)
+
+	if b.SettingsOpen() {
+		t.Errorf("初始 settingsOpen 应为 false")
+	}
+
+	b.SetSettingsOpen(true)
+	if !b.SettingsOpen() {
+		t.Errorf("设置打开后 settingsOpen 应为 true")
+	}
+	if e.others == 0 {
+		t.Errorf("SetSettingsOpen(true) 应调用 engine.SetVisible(false)")
+	}
+
+	b.SetSettingsOpen(false)
+	if b.SettingsOpen() {
+		t.Errorf("设置关闭后 settingsOpen 应为 false")
+	}
+}
+

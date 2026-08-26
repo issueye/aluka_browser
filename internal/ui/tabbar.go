@@ -17,12 +17,43 @@ import (
 
 // LayoutTabBar 顶部多标签栏：
 // 左侧红绿灯窗口控制，中间胶囊形标签页列表（含站点头像）与新建按钮，
+// LayoutTabBar 顶部多标签栏：
+// 左侧红绿灯窗口控制，中间胶囊形标签页列表（含站点头像）与新建按钮，
 // 右侧空白区注册为系统原生拖拽移动区域。
 func (u *UI) LayoutTabBar(gtx layout.Context) layout.Dimensions {
 	u.handleWindowControls(gtx)
 
 	if u.newTabBtn.Clicked(gtx) {
+		if u.showSettings {
+			u.showSettings = false
+			u.b.SetSettingsOpen(false)
+		}
 		u.b.CreateTab("", "新标签页")
+	}
+
+	// 优先处理所有标签页的点击与关闭事件，确保当前帧即时响应高亮
+	tabs := u.b.Tabs()
+	for i := range tabs {
+		tab := tabs[i]
+		ctl := u.tabCtls[tab.ID]
+		if ctl == nil {
+			ctl = &tabCtl{}
+			u.tabCtls[tab.ID] = ctl
+		}
+
+		if ctl.close.Clicked(gtx) {
+			u.b.CloseTab(i)
+			u.pruneTabControls()
+			break
+		}
+		if ctl.click.Clicked(gtx) {
+			if u.showSettings {
+				u.showSettings = false
+				u.b.SetSettingsOpen(false)
+			}
+			u.b.SwitchTab(i)
+			break
+		}
 	}
 
 	var children []layout.FlexChild
@@ -49,8 +80,8 @@ func (u *UI) LayoutTabBar(gtx layout.Context) layout.Dimensions {
 		})
 	}))
 
-	// 2. 标签页列表（快照 + 活跃下标在同一帧内保持一致）
-	tabs := u.b.Tabs()
+	// 2. 标签页列表（以最新数据为准）
+	tabs = u.b.Tabs()
 	activeIdx := u.b.ActiveIndex()
 	for i := range tabs {
 		tab := tabs[i]
@@ -62,16 +93,7 @@ func (u *UI) LayoutTabBar(gtx layout.Context) layout.Dimensions {
 			u.tabCtls[tab.ID] = ctl
 		}
 
-		if ctl.close.Clicked(gtx) {
-			u.b.CloseTab(idx)
-			u.pruneTabControls()
-			continue
-		}
-		if ctl.click.Clicked(gtx) {
-			u.b.SwitchTab(idx)
-		}
-
-		children = append(children, u.tabChild(tab, idx == activeIdx, ctl))
+		children = append(children, u.tabChild(tab, idx == activeIdx && !u.showSettings, ctl))
 	}
 
 	// 3. ＋ 新建标签按钮
@@ -164,27 +186,34 @@ func (u *UI) tabContent(tab browser.Tab, title string, textColor, closeColor col
 	return func(gtx layout.Context) layout.Dimensions {
 		return layout.Inset{
 			Top: unit.Dp(5), Bottom: unit.Dp(5),
-			Left: unit.Dp(10), Right: unit.Dp(6),
+			Left: unit.Dp(8), Right: unit.Dp(6),
 		}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
-				// 站点头像
+				// 可点击的主体区域（头像 + 标题）
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					if badge, ok := SiteBadgeFor(tab.URL); ok {
-						return u.siteBadge(gtx, badge)
-					}
-					return layout.Dimensions{}
+					return ctl.click.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+						return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+							// 站点头像
+							layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+								if badge, ok := SiteBadgeFor(tab.URL); ok {
+									return u.siteBadge(gtx, badge)
+								}
+								return layout.Dimensions{}
+							}),
+							layout.Rigid(spacer(6)),
+							// 标题
+							layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+								lbl := material.Label(u.theme, unit.Sp(11), title)
+								lbl.Color = textColor
+								lbl.MaxLines = 1
+								lbl.Truncator = "..."
+								gtx.Constraints.Max.X = dp(gtx, 120)
+								return lbl.Layout(gtx)
+							}),
+						)
+					})
 				}),
-				layout.Rigid(spacer(6)),
-				// 标题
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					lbl := material.Label(u.theme, unit.Sp(11), title)
-					lbl.Color = textColor
-					lbl.MaxLines = 1
-					lbl.Truncator = "..."
-					gtx.Constraints.Max.X = dp(gtx, 120)
-					return lbl.Layout(gtx)
-				}),
-				layout.Rigid(spacer(3)),
+				layout.Rigid(spacer(4)),
 				// 关闭按钮 ×（常驻占位避免宽度抖动，非活跃时淡化）
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					btn := material.IconButton(u.theme, &ctl.close, iconClose, "关闭标签页")

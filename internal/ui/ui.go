@@ -51,13 +51,18 @@ type UI struct {
 	maximized bool
 
 	// 工具栏
-	newTabBtn  widget.Clickable
-	backBtn    widget.Clickable
-	forwardBtn widget.Clickable
-	reloadBtn  widget.Clickable
-	homeBtn    widget.Clickable
-	goBtn      widget.Clickable
-	urlEditor  widget.Editor
+	newTabBtn   widget.Clickable
+	backBtn     widget.Clickable
+	forwardBtn  widget.Clickable
+	reloadBtn   widget.Clickable
+	homeBtn     widget.Clickable
+	goBtn       widget.Clickable
+	settingsBtn widget.Clickable
+	urlEditor   widget.Editor
+
+	// 设置页面状态
+	showSettings bool
+	settings     settingsState
 
 	// 动态控件集合
 	tabCtls map[string]*tabCtl
@@ -84,6 +89,7 @@ func New(th *material.Theme, b *browser.Browser, win *app.Window) *UI {
 	for _, bm := range b.Bookmarks() {
 		u.bmCtls = append(u.bmCtls, &bmCtl{data: bm})
 	}
+	u.initSettingsState()
 	return u
 }
 
@@ -124,8 +130,11 @@ func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
 			top += dims.Size.Y
 			return dims
 		}),
-		// 页面内容区占位（WebView2 子窗口将覆盖在此区域之上）
+		// 页面内容区占位（浏览时 WebView2 覆盖在此之上；打开设置时由 Gio 绘制设置界面）
 		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
+			if u.showSettings {
+				return u.LayoutSettings(gtx)
+			}
 			paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
 			return layout.Dimensions{Size: gtx.Constraints.Max}
 		}),

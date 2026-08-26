@@ -12,6 +12,7 @@ import (
 	"gioui.org/widget/material"
 
 	"gio-browser/internal/browser"
+	"gio-browser/internal/config"
 	"gio-browser/internal/ui"
 	"gio-browser/internal/webview"
 	"gio-browser/internal/win32"
@@ -25,6 +26,9 @@ func Main() { gioapp.Main() }
 
 // Run 创建窗口并进入主事件循环，窗口关闭时返回。
 func Run() error {
+	// 加载用户本地配置并初始化网络代理环境变量
+	config.Load()
+
 	win := new(gioapp.Window)
 	win.Option(
 		gioapp.Title(WindowTitle),
