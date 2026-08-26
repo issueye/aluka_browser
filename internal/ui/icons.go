@@ -21,6 +21,11 @@ var (
 	iconDescription, _ = widget.NewIcon(icons.ActionDescription)
 	iconFlashOn, _     = widget.NewIcon(icons.ImageFlashOn)
 	iconBookmark, _    = widget.NewIcon(icons.ActionBookmark)
+	iconExtension, _   = widget.NewIcon(icons.ActionExtension)
+	iconCode, _        = widget.NewIcon(icons.ActionCode)
+	iconEdit, _        = widget.NewIcon(icons.EditorModeEdit)
+	iconDelete, _      = widget.NewIcon(icons.ActionDelete)
+	iconPlay, _        = widget.NewIcon(icons.AVPlayArrow)
 
 	// 地址栏前缀：https 显示锁，其余显示地球
 	iconLock  = mustNewIcon(icons.ActionLock)

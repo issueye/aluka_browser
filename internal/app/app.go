@@ -13,6 +13,7 @@ import (
 
 	"gio-browser/internal/browser"
 	"gio-browser/internal/config"
+	"gio-browser/internal/scripting"
 	"gio-browser/internal/ui"
 	"gio-browser/internal/webview"
 	"gio-browser/internal/win32"
@@ -41,6 +42,15 @@ func Run() error {
 	engine := webview.New()
 	b := browser.New(engine)
 	u := ui.New(th, b, win)
+
+	// 初始化 Aluka 脚本与 AI Agent 控制引擎
+	scriptEng, err := scripting.NewEngine(b)
+	if err != nil {
+		log.Printf("[Scripting] 初始化 Aluka 脚本引擎警告: %v", err)
+	} else {
+		log.Printf("[Scripting] Aluka 脚本引擎已就绪，已挂载 browser 与 agent 控制接口")
+		defer scriptEng.Close()
+	}
 
 	startEngineAsync(WindowTitle, engine, b, win)
 

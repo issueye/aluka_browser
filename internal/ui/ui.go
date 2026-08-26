@@ -51,18 +51,21 @@ type UI struct {
 	maximized bool
 
 	// 工具栏
-	newTabBtn   widget.Clickable
-	backBtn     widget.Clickable
-	forwardBtn  widget.Clickable
-	reloadBtn   widget.Clickable
-	homeBtn     widget.Clickable
-	goBtn       widget.Clickable
-	settingsBtn widget.Clickable
-	urlEditor   widget.Editor
+	newTabBtn      widget.Clickable
+	backBtn        widget.Clickable
+	forwardBtn     widget.Clickable
+	reloadBtn      widget.Clickable
+	homeBtn        widget.Clickable
+	goBtn          widget.Clickable
+	settingsBtn    widget.Clickable
+	userscriptsBtn widget.Clickable
+	urlEditor      widget.Editor
 
-	// 设置页面状态
-	showSettings bool
-	settings     settingsState
+	// 设置页面与用户脚本面板状态
+	showSettings    bool
+	settings        settingsState
+	showUserscripts bool
+	usUI            userscriptUIState
 
 	// 动态控件集合
 	tabCtls map[string]*tabCtl
@@ -90,6 +93,7 @@ func New(th *material.Theme, b *browser.Browser, win *app.Window) *UI {
 		u.bmCtls = append(u.bmCtls, &bmCtl{data: bm})
 	}
 	u.initSettingsState()
+	u.initUserscriptsUIState()
 	return u
 }
 
@@ -130,8 +134,11 @@ func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
 			top += dims.Size.Y
 			return dims
 		}),
-		// 页面内容区占位（浏览时 WebView2 覆盖在此之上；打开设置时由 Gio 绘制设置界面）
+		// 页面内容区占位（浏览时 WebView2 覆盖在此之上；打开设置或篡改猴时由 Gio 绘制对应面板）
 		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
+			if u.showUserscripts {
+				return u.LayoutUserscripts(gtx)
+			}
 			if u.showSettings {
 				return u.LayoutSettings(gtx)
 			}

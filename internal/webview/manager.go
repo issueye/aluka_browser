@@ -13,6 +13,7 @@ import (
 
 	"github.com/jchv/go-webview2/pkg/edge"
 
+	"gio-browser/internal/userscript"
 	"gio-browser/internal/win32"
 )
 
@@ -99,6 +100,11 @@ func (m *Manager) createTabLocked(tabID, url string) {
 		cb := m.onState
 		u, t := view.URL, view.Title
 		m.mu.Unlock()
+
+		// 自动匹配并注入当前 URL 相关的用户脚本（篡改猴能力）
+		if injectCode := userscript.GetGlobalManager().BuildInjectionForURL(u); injectCode != "" {
+			view.Chromium.Eval(injectCode)
+		}
 
 		if cb != nil {
 			cb(id, u, t, false)

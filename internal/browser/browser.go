@@ -260,6 +260,22 @@ func (b *Browser) FocusContent() {
 	}
 }
 
+// EvalInWebview 在当前活跃标签页的网页环境中执行 JavaScript。
+func (b *Browser) EvalInWebview(script string) {
+	if e := b.currentEngine(); e != nil {
+		if manager, ok := e.(interface{ Eval(string) }); ok {
+			manager.Eval(script)
+		}
+	}
+}
+
+// SetStatusText 手动设置状态栏文案。
+func (b *Browser) SetStatusText(text string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.status = text
+}
+
 func (b *Browser) currentEngine() Engine {
 	b.mu.Lock()
 	defer b.mu.Unlock()

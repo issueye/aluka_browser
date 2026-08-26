@@ -30,9 +30,17 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 	case u.settingsBtn.Clicked(gtx):
 		u.showSettings = !u.showSettings
 		if u.showSettings {
+			u.showUserscripts = false
 			u.initSettingsState()
 		}
-		u.b.SetSettingsOpen(u.showSettings)
+		u.b.SetSettingsOpen(u.showSettings || u.showUserscripts)
+	case u.userscriptsBtn.Clicked(gtx):
+		u.showUserscripts = !u.showUserscripts
+		if u.showUserscripts {
+			u.showSettings = false
+			u.initUserscriptsUIState()
+		}
+		u.b.SetSettingsOpen(u.showUserscripts || u.showSettings)
 	}
 
 	// 地址栏回车提交
@@ -97,6 +105,21 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(spacer(8)),
+			// 篡改猴 / 用户脚本中心按钮 🧩
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				btn := material.IconButton(u.theme, &u.userscriptsBtn, iconExtension, "用户脚本中心")
+				if u.showUserscripts {
+					btn.Background = CAccent
+					btn.Color = COnAccent
+				} else {
+					btn.Background = CBtnBG
+					btn.Color = CBtnFG
+				}
+				btn.Size = unit.Dp(18)
+				btn.Inset = layout.UniformInset(unit.Dp(7))
+				return btn.Layout(gtx)
+			}),
+			layout.Rigid(spacer(6)),
 			// 设置按钮 ⚙️（放置在 Header 工具栏最右侧）
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				btn := material.IconButton(u.theme, &u.settingsBtn, iconSettings, "设置")
@@ -117,8 +140,9 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 
 // submitAddress 归一化地址栏输入并导航，随后把焦点交还页面。
 func (u *UI) submitAddress(gtx layout.Context) {
-	if u.showSettings {
+	if u.showSettings || u.showUserscripts {
 		u.showSettings = false
+		u.showUserscripts = false
 		u.b.SetSettingsOpen(false)
 	}
 	target := browser.NormalizeInputURL(u.urlEditor.Text())
