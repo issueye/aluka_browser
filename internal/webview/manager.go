@@ -184,8 +184,6 @@ func (m *Manager) SwitchTab(tabID string) {
 		prevView := m.views[prevActive]
 		m.mu.Unlock()
 
-		log.Printf("[webview] STA 切换 prev=%s new=%s prevView=%v newView=%v", prevActive, tabID, prevView != nil, newView != nil)
-
 		if prevView != nil && prevActive != tabID && prevView.childHWND != 0 {
 			win32.Hide(prevView.childHWND)
 		}

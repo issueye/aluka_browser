@@ -139,4 +139,3 @@ func TestSettingsOpen(t *testing.T) {
 		t.Errorf("设置关闭后 settingsOpen 应为 false")
 	}
 }
-

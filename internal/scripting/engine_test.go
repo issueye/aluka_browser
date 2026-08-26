@@ -195,4 +195,3 @@ func TestScriptEngine_UserscriptHost(t *testing.T) {
 		t.Fatalf("userscript 宿主测试失败: %v", err)
 	}
 }
-

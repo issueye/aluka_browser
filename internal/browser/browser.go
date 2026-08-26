@@ -7,7 +7,6 @@ package browser
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 )
@@ -167,7 +166,6 @@ func (b *Browser) SwitchTab(i int) {
 	engine := b.engine
 	b.mu.Unlock()
 
-	log.Printf("[browser] 切换标签 idx=%d id=%s", i, tab.ID)
 	if engine != nil {
 		engine.SwitchTab(tab.ID)
 	}
@@ -332,4 +330,3 @@ func (b *Browser) SetSettingsOpen(open bool) {
 		engine.SetVisible(!open)
 	}
 }
-

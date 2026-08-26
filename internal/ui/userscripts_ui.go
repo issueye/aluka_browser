@@ -223,22 +223,18 @@ func (u *UI) layoutUserscriptHeader(gtx layout.Context) layout.Dimensions {
 		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
 			return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: 0}}
 		}),
-		// ➕ 新建脚本按钮
+		// 新建脚本按钮（矢量加号图标，emoji 会缺字渲染为方块）
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			btn := material.Button(u.theme, &u.usUI.newBtn, "➕ 新建脚本")
-			btn.Background = CAccent
-			btn.Color = COnAccent
-			btn.Inset = layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(12), Right: unit.Dp(12)}
-			return btn.Layout(gtx)
+			return iconLabelButton(gtx, u.theme, &u.usUI.newBtn,
+				iconAdd, "新建脚本",
+				CAccent, COnAccent, unit.Sp(13), 13, 6, 14)
 		}),
 		layout.Rigid(spacer(8)),
 		// 返回网页按钮
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			btn := material.Button(u.theme, &u.usUI.closeBtn, "返回网页 ✕")
-			btn.Background = CBtnBG
-			btn.Color = CBtnFG
-			btn.Inset = layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(12), Right: unit.Dp(12)}
-			return btn.Layout(gtx)
+			return iconLabelButton(gtx, u.theme, &u.usUI.closeBtn,
+				iconClose, "返回网页",
+				CBtnBG, CBtnFG, unit.Sp(13), 12, 6, 14)
 		}),
 	)
 }
@@ -339,24 +335,18 @@ func (u *UI) layoutScriptCard(gtx layout.Context, s *userscript.Script) layout.D
 						return btn.Layout(gtx)
 					}),
 					layout.Rigid(spacer(6)),
-					// 编辑按钮
+					// 编辑按钮（矢量铅笔图标）
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						btn := material.Button(u.theme, &ctl.edit, "编辑 ✏️")
-						btn.Background = CBtnBG
-						btn.Color = CBtnFG
-						btn.TextSize = unit.Sp(11)
-						btn.Inset = layout.Inset{Top: unit.Dp(4), Bottom: unit.Dp(4), Left: unit.Dp(10), Right: unit.Dp(10)}
-						return btn.Layout(gtx)
+						return iconLabelButton(gtx, u.theme, &ctl.edit,
+							iconEdit, "编辑",
+							CBtnBG, CBtnFG, unit.Sp(11), 11, 4, 10)
 					}),
 					layout.Rigid(spacer(6)),
-					// 删除按钮
+					// 删除按钮（矢量垃圾桶图标）
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						btn := material.Button(u.theme, &ctl.delete, "删除 🗑️")
-						btn.Background = CBtnBG
-						btn.Color = CCloseFill
-						btn.TextSize = unit.Sp(11)
-						btn.Inset = layout.Inset{Top: unit.Dp(4), Bottom: unit.Dp(4), Left: unit.Dp(8), Right: unit.Dp(8)}
-						return btn.Layout(gtx)
+						return iconLabelButton(gtx, u.theme, &ctl.delete,
+							iconDelete, "删除",
+							CBtnBG, CCloseFill, unit.Sp(11), 11, 4, 8)
 					}),
 				)
 			}),
@@ -389,13 +379,11 @@ func (u *UI) layoutUserscriptEditor(gtx layout.Context) layout.Dimensions {
 				layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
 					return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: 0}}
 				}),
-				// 保存按钮
+				// 保存按钮（矢量保存图标）
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					btn := material.Button(u.theme, &u.usUI.saveCodeBtn, "💾 保存脚本")
-					btn.Background = CAccent
-					btn.Color = COnAccent
-					btn.Inset = layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(14), Right: unit.Dp(14)}
-					return btn.Layout(gtx)
+					return iconLabelButton(gtx, u.theme, &u.usUI.saveCodeBtn,
+						iconSave, "保存脚本",
+						CAccent, COnAccent, unit.Sp(13), 13, 6, 14)
 				}),
 				layout.Rigid(spacer(8)),
 				// 取消返回列表
@@ -463,4 +451,3 @@ func (u *UI) badgePill(gtx layout.Context, text string, bg, fg color.NRGBA) layo
 	call.Add(gtx.Ops)
 	return dims
 }
-

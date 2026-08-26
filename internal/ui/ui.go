@@ -223,6 +223,50 @@ func glyph(gtx layout.Context, ic *widget.Icon, size int, c color.NRGBA) layout.
 	return ic.Layout(gtx, c)
 }
 
+// iconLabelButton 渲染「矢量图标 + 文字」圆角按钮。
+// material.Button 只支持纯文本，而 emoji 字形在默认字体集中缺字会渲染成方块，
+// 因此凡需要图标的按钮一律用该组合方式。
+func iconLabelButton(gtx layout.Context, th *material.Theme, click *widget.Clickable,
+	icon *widget.Icon, label string,
+	bg, fg color.NRGBA, textSize unit.Sp, iconSize, vPad, hPad int,
+) layout.Dimensions {
+	return click.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+		macro := op.Record(gtx.Ops)
+		dims := layout.Inset{
+			Top: unit.Dp(vPad), Bottom: unit.Dp(vPad),
+			Left: unit.Dp(hPad), Right: unit.Dp(hPad),
+		}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					if icon == nil {
+						return layout.Dimensions{}
+					}
+					return glyph(gtx, icon, iconSize, fg)
+				}),
+				layout.Rigid(spacer(5)),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					lbl := material.Label(th, textSize, label)
+					lbl.Color = fg
+					return lbl.Layout(gtx)
+				}),
+			)
+		})
+		call := macro.Stop()
+
+		radius := gtx.Dp(unit.Dp(6))
+		rrect := clip.RRect{
+			Rect: image.Rectangle{Max: dims.Size},
+			SE:   radius, SW: radius, NE: radius, NW: radius,
+		}
+		stack := rrect.Push(gtx.Ops)
+		paint.FillShape(gtx.Ops, bg, clip.Rect{Max: dims.Size}.Op())
+		stack.Pop()
+
+		call.Add(gtx.Ops)
+		return dims
+	})
+}
+
 var transparent = color.NRGBA{}
 
 func dp(gtx layout.Context, v int) int { return gtx.Dp(unit.Dp(v)) }

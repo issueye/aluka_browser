@@ -7,10 +7,10 @@ import (
 
 // 图标资源（material design 矢量图标，编译期内嵌）。
 var (
-	iconBack, _    = widget.NewIcon(icons.NavigationArrowBack)
-	iconForward, _ = widget.NewIcon(icons.NavigationArrowForward)
-	iconRefresh, _ = widget.NewIcon(icons.NavigationRefresh)
-	iconHome, _    = widget.NewIcon(icons.ActionHome)
+	iconBack, _        = widget.NewIcon(icons.NavigationArrowBack)
+	iconForward, _     = widget.NewIcon(icons.NavigationArrowForward)
+	iconRefresh, _     = widget.NewIcon(icons.NavigationRefresh)
+	iconHome, _        = widget.NewIcon(icons.ActionHome)
 	iconAdd, _         = widget.NewIcon(icons.ContentAdd)
 	iconClose, _       = widget.NewIcon(icons.NavigationClose)
 	iconSettings, _    = widget.NewIcon(icons.ActionSettings)

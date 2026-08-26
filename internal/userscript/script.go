@@ -10,11 +10,11 @@ import (
 
 // Script 代表一个独立的用户脚本对象。
 type Script struct {
-	ID        string   `json:"id"`
-	Code      string   `json:"code"`
-	Enabled   bool     `json:"enabled"`
-	CreatedAt int64    `json:"created_at"`
-	UpdatedAt int64    `json:"updated_at"`
+	ID        string `json:"id"`
+	Code      string `json:"code"`
+	Enabled   bool   `json:"enabled"`
+	CreatedAt int64  `json:"created_at"`
+	UpdatedAt int64  `json:"updated_at"`
 
 	// 缓存从 Code 解析出的元数据
 	Meta Metadata `json:"meta"`
