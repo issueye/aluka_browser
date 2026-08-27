@@ -2,10 +2,18 @@ package app
 
 import "image"
 
+//go:generate go run ../../tools/genicon -out ../../icon.ico
+
 // AppIcons 程序化绘制应用图标：深色圆角方块上一枚带环行星，
 // 与浏览器深色 UI 同一视觉语言；无需随仓库维护图片资源。
 func AppIcons() (big, small *image.NRGBA) {
 	return drawAppIcon(32), drawAppIcon(16)
+}
+
+// IconImage 返回指定尺寸的应用图标位图，供资源生成工具（tools/genicon）
+// 生成 exe 内嵌 ICO 资源时复用同一视觉定义。
+func IconImage(size int) *image.NRGBA {
+	return drawAppIcon(size)
 }
 
 // 超采样倍率：内部按 SS 倍分辨率光栅化后盒式降采样，获得平滑边缘。
