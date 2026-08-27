@@ -1,0 +1,5 @@
+# 行尾格式锁定：
+# - *.bat 必须 CRLF：cmd 对批处理的标签解析在 LF 行尾下不可靠；
+# - *.sh 必须 LF：CR 字符会破坏 shebang 与字符串匹配。
+*.bat text eol=crlf
+*.sh text eol=lf
