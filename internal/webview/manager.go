@@ -88,10 +88,20 @@ func (m *Manager) CreateTab(tabID, url string) {
 		})
 		return
 	}
-	m.dispatch(func() { m.createTabLocked(tabID, url) })
+	m.dispatch(func() { m.createTabLocked(tabID, url, nil) })
 }
 
-func (m *Manager) createTabLocked(tabID, url string) {
+// CreateExtensionTab 为扩展弹窗标签创建 WebView2（并把扩展目录映射到虚拟域名）。
+func (m *Manager) CreateExtensionTab(tabID, url, host, dir string) {
+	m.dispatch(func() { m.createTabLocked(tabID, url, &extTabOpts{Host: host, Dir: dir}) })
+}
+
+type extTabOpts struct {
+	Host string
+	Dir  string
+}
+
+func (m *Manager) createTabLocked(tabID, url string, extOpts *extTabOpts) {
 	m.mu.Lock()
 	parentHWND := m.parentHWND
 	bounds := m.lastBounds
@@ -157,6 +167,13 @@ func (m *Manager) createTabLocked(tabID, url string) {
 	if !ch.Embed(childHWND) {
 		log.Printf("[WebView2] 标签页嵌入失败: %s", tabID)
 		return
+	}
+
+	// 扩展弹窗：将目录映射到虚拟域名（http:// 方案，避免 file:// 受限）
+	if extOpts != nil && extOpts.Host != "" && extOpts.Dir != "" {
+		if i3 := ch.GetICoreWebView2_3(); i3 != nil {
+			_ = i3.SetVirtualHostNameToFolderMapping(extOpts.Host, extOpts.Dir, 2 /* Allow */)
+		}
 	}
 
 	ch.Init(injectedScript)

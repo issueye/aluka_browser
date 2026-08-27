@@ -144,9 +144,12 @@ func TestLoadFromDirAndMatches(t *testing.T) {
 		t.Fatal("引用文件缺失时应报错")
 	}
 
-	// popup URL 生成
-	if got := e.PopupURL(); !strings.HasPrefix(got, "file:///") || !strings.HasSuffix(got, "popup.html") {
+	// popup URL 生成（已映射为虚拟域名 https 方案）
+	if got := e.PopupURL(); !strings.HasPrefix(got, "https://") || !strings.HasSuffix(got, "popup.html") {
 		t.Fatalf("popup URL 异常: %s", got)
+	}
+	if url, host, dir := e.PopupVirtualURL(); host == "" || dir == "" || !strings.HasPrefix(url, "https://"+host+"/") {
+		t.Fatalf("虚拟域名 URL 异常: %s host=%s", url, host)
 	}
 }
 

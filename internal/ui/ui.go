@@ -22,8 +22,9 @@ import (
 
 // FrameMetrics 描述一次布局后各 chrome 区域的高度（物理像素，DIP 转换后）。
 type FrameMetrics struct {
-	Top    int // 标签栏+工具栏+书签栏 总高
-	Status int // 底部状态栏高
+	Top     int // 标签栏+工具栏+书签栏 总高
+	Status  int // 底部状态栏高
+	Sidebar int // 右侧插件侧栏宽度（展开时占用宽度，收起为 0）
 }
 
 // tabCtl 单个标签页的交互控件状态（与 browser.Tab 数据模型分离）。
@@ -64,6 +65,9 @@ type UI struct {
 	// 进程管理浮窗（可为 nil，按钮点击则无效果）。
 	OnOpenProcessManager func()
 
+	// 插件侧栏
+	pluginSidebar pluginSidebarState
+
 	// 设置中心（活跃标签为 gio://settings 时渲染于内容区）
 	settings settingsUI
 
@@ -91,6 +95,7 @@ func New(th *material.Theme, b *browser.Browser, win *app.Window) *UI {
 		u.lastSyncedURL = t.URL
 	}
 	u.initSettingsState()
+	u.initPluginSidebarState()
 	return u
 }
 
@@ -125,13 +130,23 @@ func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
 			top += dims.Size.Y
 			return dims
 		}),
-		// 页面内容区：普通标签由 WebView2 覆盖；设置标签渲染设置中心
+		// 页面内容区：主内容（WebView2 / 设置中心）与右侧插件侧栏水平并排；
+		// 侧栏展开时占用宽度（FrameMetrics.Sidebar 反馈给 app 层扣除 WebView 宽度），
+		// 收起时零占位，网页复原满宽
 		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
-			if u.b.IsViewingSettings() {
-				return u.LayoutSettingsHub(gtx)
-			}
-			paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
-			return layout.Dimensions{Size: gtx.Constraints.Max}
+			m.Sidebar = u.LayoutPluginSidebarWidth(gtx)
+			return layout.Flex{Axis: layout.Horizontal}.Layout(gtx,
+				layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
+					if u.b.IsViewingSettings() {
+						return u.LayoutSettingsHub(gtx)
+					}
+					paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
+					return layout.Dimensions{Size: gtx.Constraints.Max}
+				}),
+				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+					return u.layoutPluginSidebar(gtx)
+				}),
+			)
 		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			dims := background(gtx, CStatusBG, func(gtx layout.Context) layout.Dimensions {

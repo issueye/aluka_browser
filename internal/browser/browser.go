@@ -42,6 +42,7 @@ type Bookmark struct {
 // Engine 浏览器模型依赖的页面引擎抽象；webview.Manager 是其默认实现。
 type Engine interface {
 	CreateTab(tabID, url string)
+	CreateExtensionTab(tabID, url, host, dir string)
 	SwitchTab(tabID string)
 	CloseTab(tabID string)
 	Navigate(tabID, url string)
@@ -205,6 +206,27 @@ func (b *Browser) CreateTab(url, title string) {
 
 	if engine != nil {
 		engine.CreateTab(id, url)
+	}
+}
+
+// CreateExtensionTab 新建扩展弹窗标签（独立 http 方案，避免 file:// 受限）。
+func (b *Browser) CreateExtensionTab(url, title, host, dir string) {
+	if url == "" {
+		url = b.HomePage()
+	}
+	if title == "" {
+		title = "新标签页"
+	}
+	id := fmt.Sprintf("tab-%d", time.Now().UnixNano())
+
+	b.mu.Lock()
+	b.tabs = append(b.tabs, &Tab{ID: id, Title: title, URL: url})
+	b.active = len(b.tabs) - 1
+	engine := b.engine
+	b.mu.Unlock()
+
+	if engine != nil {
+		engine.CreateExtensionTab(id, url, host, dir)
 	}
 }
 

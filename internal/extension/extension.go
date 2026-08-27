@@ -72,6 +72,11 @@ func deriveID(absDir string) string {
 	return fmt.Sprintf("%016x", h.Sum64())[:8]
 }
 
+// VirtualHost 为扩展生成唯一的虚拟域名（每扩展唯一，避免多标签并发覆盖）。
+func (e *Extension) VirtualHost() string {
+	return fmt.Sprintf("ext-%s.ext", e.ID)
+}
+
 // MatchesURL 判断扩展的任一 content_scripts 组是否命中目标 URL
 // （排除规则优先，匹配算法与用户脚本共用 userscript.MatchPattern）。
 func (e *Extension) MatchesURL(targetURL string) bool {
@@ -98,12 +103,23 @@ func (e *Extension) MatchesURL(targetURL string) bool {
 	return false
 }
 
-// PopupURL 返回工具按钮 popup 页面的 file:// URL（未配置则返回空串）。
+// PopupURL 返回工具按钮 popup 页面的 URL（未配置则返回空串）。
+// 当前实现为 file:// 兼容保留；新创建标签建议使用 PopupVirtualURL + CreateExtensionTab。
 func (e *Extension) PopupURL() string {
+	u, _, _ := e.PopupVirtualURL()
+	return u
+}
+
+// PopupVirtualURL 返回扩展弹窗的虚拟域名 URL 与主机名（便于映射）。
+// 算法：虚拟域名 = ext-<id>.ext，URL = https://<host>/<rel>。
+func (e *Extension) PopupVirtualURL() (string, string, string) {
 	a := e.Manifest.ToolbarAction()
 	if a == nil || a.DefaultPopup == "" {
-		return ""
+		return "", "", ""
 	}
-	p := filepath.ToSlash(filepath.Join(e.Dir, filepath.FromSlash(a.DefaultPopup)))
-	return "file:///" + strings.TrimPrefix(p, "/")
+	host := e.VirtualHost()
+	rel := filepath.ToSlash(filepath.FromSlash(a.DefaultPopup))
+	rel = strings.TrimPrefix(rel, "/")
+	u := fmt.Sprintf("https://%s/%s", host, rel)
+	return u, host, e.Dir
 }

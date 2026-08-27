@@ -82,8 +82,8 @@ func (u *UI) handleExtensionEvents(gtx layout.Context) {
 		}
 
 		if ctl.openPopup.Clicked(gtx) {
-			if popup := e.PopupURL(); popup != "" {
-				u.b.CreateTab(popup, e.Manifest.Name)
+			if url, host, dir := e.PopupVirtualURL(); url != "" {
+				u.b.CreateExtensionTab(url, e.Manifest.Name, host, dir)
 			}
 		}
 

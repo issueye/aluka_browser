@@ -32,6 +32,8 @@ scripting ─→ browser / userscript / config
 extension ─→ userscript(复用匹配算法)；webview ─→ extension(注入)
 procs ─→ win32(进程枚举/终止)；ui(浮窗) ─→ procs / win32
 webview / ui ─→ win32(syscall 封装)
+ui: 右侧插件侧栏（plugin_sidebar.go）与主内容水平并排于 Flexed(1) 内，
+    侧栏宽度经 FrameMetrics.Sidebar 统一扣除 WebView 宽度（app.SetBounds(0, Top, w-Sidebar, bottom)）
 ```
 
 - **win32 进程 API 的坑（已修复，勿回退）**：

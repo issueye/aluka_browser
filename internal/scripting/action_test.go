@@ -17,6 +17,7 @@ type mockEngine struct {
 }
 
 func (m *mockEngine) CreateTab(tabID, url string) { m.created = append(m.created, tabID+":"+url) }
+func (m *mockEngine) CreateExtensionTab(tabID, url, host, dir string) { m.created = append(m.created, tabID+":"+url) }
 func (m *mockEngine) SwitchTab(tabID string)      { m.switched = append(m.switched, tabID) }
 func (m *mockEngine) CloseTab(tabID string)       { m.closed = append(m.closed, tabID) }
 func (m *mockEngine) Navigate(tabID, url string)  { m.navigated = append(m.navigated, url) }

@@ -10,6 +10,7 @@ import (
 	"gioui.org/widget/material"
 
 	"gio-browser/internal/browser"
+	"gio-browser/internal/config"
 )
 
 // LayoutTopBar 主工具栏：前进/后退/刷新/主页 + 地址栏 + 前往按钮。
@@ -28,11 +29,29 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 	case u.goBtn.Clicked(gtx):
 		u.submitAddress(gtx)
 	case u.settingsBtn.Clicked(gtx):
+		// 打开设置中心前收起插件侧栏，避免两者同时出现
+		u.closePluginSidebar()
 		u.b.OpenSettings()
 	case u.procBtn.Clicked(gtx):
 		if u.OnOpenProcessManager != nil {
 			u.OnOpenProcessManager()
 		}
+	case u.pluginSidebar.toggle.Clicked(gtx):
+		// 设置中心页中禁用插件侧栏（打开设置时已自动收起，防止再次展开）
+		if u.b.IsViewingSettings() {
+			break
+		}
+		u.pluginSidebar.visible = !u.pluginSidebar.visible
+		vis := u.pluginSidebar.visible
+		cfg := config.Current()
+		cfg.PluginSidebarVisible = &vis
+		if u.pluginSidebar.width == 0 {
+			_, defW := config.PluginSidebarDefaults()
+			cfg.PluginSidebarWidth = defW
+		} else {
+			cfg.PluginSidebarWidth = u.pluginSidebar.width
+		}
+		_ = config.Save(cfg)
 	}
 
 	// 地址栏回车提交
@@ -97,6 +116,16 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(spacer(8)),
+			// 插件侧栏切换
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				btn := material.IconButton(u.theme, &u.pluginSidebar.toggle, iconExtensions, "插件侧栏")
+				btn.Background = CBtnBG
+				btn.Color = CBtnFG
+				btn.Size = unit.Dp(18)
+				btn.Inset = layout.UniformInset(unit.Dp(7))
+				return btn.Layout(gtx)
+			}),
+			layout.Rigid(spacer(6)),
 			// 进程管理浮窗按钮
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				btn := material.IconButton(u.theme, &u.procBtn, iconProc, "进程管理")

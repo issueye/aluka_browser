@@ -264,3 +264,14 @@ func allocDIB(hdc uintptr, w, h int32) (*byte, uintptr) {
 	)
 	return bits, hbmp
 }
+
+// GetWindowRect 获取窗口的屏幕矩形（物理像素）。失败返回零值与 false。
+func GetWindowRect(hwnd uintptr) (Rect, bool) {
+	var r struct{ L, T, R, B int32 }
+	procGetWindowRect := user32.NewProc("GetWindowRect")
+	ok, _, _ := procGetWindowRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))
+	if ok == 0 {
+		return Rect{}, false
+	}
+	return Rect{Left: r.L, Top: r.T, Right: r.R, Bottom: r.B}, true
+}

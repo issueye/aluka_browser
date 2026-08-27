@@ -15,6 +15,7 @@ type stubEngine struct {
 }
 
 func (s *stubEngine) CreateTab(tabID, url string) { s.created = append(s.created, tabID+"\x00"+url) }
+func (s *stubEngine) CreateExtensionTab(tabID, url, host, dir string) { s.created = append(s.created, tabID+string([]byte{0})+url) }
 func (s *stubEngine) SwitchTab(tabID string)      { s.switched = append(s.switched, tabID) }
 func (s *stubEngine) CloseTab(tabID string)       { s.closed = append(s.closed, tabID) }
 func (s *stubEngine) Navigate(tabID, url string)  { s.navigated = append(s.navigated, url) }

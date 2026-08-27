@@ -74,14 +74,18 @@ func Run() error {
 			gtx := gioapp.NewContext(&ops, e)
 			metrics := u.LayoutRoot(gtx)
 
-			// 同步页面引擎到内容区矩形
+			// 同步页面引擎到内容区矩形：右侧插件侧栏展开时扣除其宽度
 			w := int32(gtx.Constraints.Max.X)
 			h := int32(gtx.Constraints.Max.Y)
 			bottom := h - int32(metrics.Status)
 			if bottom < int32(metrics.Top) {
 				bottom = int32(metrics.Top)
 			}
-			engine.SetBounds(0, int32(metrics.Top), w, bottom)
+			right := w - int32(metrics.Sidebar)
+			if right < 0 {
+				right = 0
+			}
+			engine.SetBounds(0, int32(metrics.Top), right, bottom)
 
 			e.Frame(gtx.Ops)
 		}

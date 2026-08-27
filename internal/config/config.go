@@ -19,6 +19,15 @@ type QuickLink struct {
 type Config struct {
 	HomePage   string      `json:"home_page"`  // 主页地址（新标签/回主页/最后标签回落）
 	QuickLinks []QuickLink `json:"quick_links"` // 快捷访问列表
+
+	// 插件侧栏
+	PluginSidebarVisible *bool `json:"plugin_sidebar_visible,omitempty"` // nil 表示缺省（收起）
+	PluginSidebarWidth   int   `json:"plugin_sidebar_width,omitempty"`   // dp，默认 300
+}
+
+// PluginSidebarDefaults 返回插件侧栏的默认尺寸与可见性。
+func PluginSidebarDefaults() (visible bool, width int) {
+	return false, 300
 }
 
 // DefaultHomePage 默认主页地址。
@@ -80,6 +89,10 @@ func Load() Config {
 	}
 	if len(cfg.QuickLinks) == 0 {
 		cfg.QuickLinks = DefaultQuickLinks()
+	}
+	if cfg.PluginSidebarWidth == 0 {
+		_, defW := PluginSidebarDefaults()
+		cfg.PluginSidebarWidth = defW
 	}
 	globalCfg = cfg
 	return globalCfg
