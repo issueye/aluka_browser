@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"gio-browser/internal/browser"
-	"gio-browser/internal/config"
 )
 
 // mockEngine 实现 browser.Engine 接口，记录引擎调用供断言（无需 WebView2）。
@@ -146,35 +145,13 @@ func TestExecuteAgentAction_NavigationAndEval(t *testing.T) {
 	}
 }
 
-func TestExecuteAgentAction_Proxy(t *testing.T) {
+// TestExecuteAgentAction_ProxyRemoved 验证代理动作已随代理功能移除。
+func TestExecuteAgentAction_ProxyRemoved(t *testing.T) {
 	b, _ := newTestBrowser()
-
-	raw, err := ExecuteAgentAction(b, "get_proxy", nil)
-	if err != nil {
-		t.Fatalf("get_proxy 失败: %v", err)
-	}
-	before := raw.(map[string]any)
-	t.Cleanup(func() {
-		if _, err := ExecuteAgentAction(b, "set_proxy", map[string]any{
-			"enabled": before["enabled"], "server": before["server"],
-			"bypass": before["bypass"], "type": before["type"],
-		}); err != nil {
-			t.Logf("还原代理配置失败: %v", err)
+	for _, act := range []string{"get_proxy", "set_proxy"} {
+		if _, err := ExecuteAgentAction(b, act, nil); err == nil {
+			t.Fatalf("代理动作 %s 应已移除", act)
 		}
-	})
-
-	if _, ok := before["server"]; !ok {
-		t.Fatalf("get_proxy 返回缺少 server 字段: %v", before)
-	}
-
-	if _, err := ExecuteAgentAction(b, "set_proxy", map[string]any{
-		"enabled": true, "server": "127.0.0.1:7897",
-	}); err != nil {
-		t.Fatalf("set_proxy 失败: %v", err)
-	}
-	now := config.Current()
-	if !now.ProxyEnabled || now.ProxyServer != "127.0.0.1:7897" {
-		t.Fatalf("set_proxy 未生效: %+v", now)
 	}
 }
 

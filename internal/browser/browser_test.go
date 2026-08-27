@@ -118,24 +118,40 @@ func TestUpdateTabState(t *testing.T) {
 	b.UpdateTabState(fmt.Sprintf("tab-%d-unknown", 12345), "https://x.io", "X")
 }
 
-func TestSettingsOpen(t *testing.T) {
+func TestSettingsTab(t *testing.T) {
 	e := &stubEngine{}
 	b := New(e)
 
-	if b.SettingsOpen() {
-		t.Errorf("初始 settingsOpen 应为 false")
+	if b.IsViewingSettings() {
+		t.Errorf("初始不应处于设置中心")
 	}
 
-	b.SetSettingsOpen(true)
-	if !b.SettingsOpen() {
-		t.Errorf("设置打开后 settingsOpen 应为 true")
+	b.OpenSettings()
+	if !b.IsViewingSettings() {
+		t.Errorf("OpenSettings 后应处于设置中心")
 	}
-	if e.others == 0 {
-		t.Errorf("SetSettingsOpen(true) 应调用 engine.SetVisible(false)")
+	if len(e.created) != 1 {
+		t.Errorf("打开设置应创建 1 个设置标签, got %d", len(e.created))
 	}
 
-	b.SetSettingsOpen(false)
-	if b.SettingsOpen() {
-		t.Errorf("设置关闭后 settingsOpen 应为 false")
+	b.OpenSettings()
+	if b.TabCount() != 2 {
+		t.Errorf("重复打开设置不应新建标签, got %d", b.TabCount())
+	}
+
+	// 设置页应忽略地址导航
+	b.NavigateActive("https://example.com")
+	if tab, _ := b.ActiveTab(); tab.URL != SettingsURL {
+		t.Errorf("设置标签不应被导航, got %q", tab.URL)
+	}
+
+	// 切回普通标签后导航恢复正常
+	b.SwitchTab(0)
+	if b.IsViewingSettings() {
+		t.Errorf("切回普通标签后不应处于设置中心")
+	}
+	b.NavigateActive("https://example.org")
+	if tab, _ := b.ActiveTab(); tab.URL != "https://example.org" {
+		t.Errorf("普通标签导航失败: %q", tab.URL)
 	}
 }

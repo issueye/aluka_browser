@@ -32,14 +32,12 @@ type scriptCardCtl struct {
 	delete widget.Clickable
 }
 
-// userscriptUIState 用户脚本管理面板的 UI 状态。
+// userscriptUIState 用户脚本管理面板的 UI 状态（嵌入设置中心右区）。
 type userscriptUIState struct {
 	mode usViewMode
 	list layout.List
 
-	// 顶部操作
 	newBtn      widget.Clickable
-	closeBtn    widget.Clickable
 	backListBtn widget.Clickable
 
 	// 脚本列表控件
@@ -54,50 +52,20 @@ type userscriptUIState struct {
 	statusTime time.Time
 }
 
-func (u *UI) initUserscriptsUIState() {
-	u.usUI = userscriptUIState{
-		mode:  usViewList,
-		cards: make(map[string]*scriptCardCtl),
-	}
-	u.usUI.list.Axis = layout.Vertical
-}
-
-// LayoutUserscripts 渲染篡改猴（用户脚本）管理面板主体。
-func (u *UI) LayoutUserscripts(gtx layout.Context) layout.Dimensions {
+// layoutUserscriptPanel 渲染用户脚本管理面板（由设置中心右区调用）。
+func (u *UI) layoutUserscriptPanel(gtx layout.Context) layout.Dimensions {
 	u.handleUserscriptEvents(gtx)
 
-	// 全屏深色背景
-	paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
-
-	return layout.Inset{
-		Top: unit.Dp(16), Bottom: unit.Dp(16),
-		Left: unit.Dp(24), Right: unit.Dp(24),
-	}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			maxWidth := gtx.Dp(unit.Dp(720))
-			if gtx.Constraints.Max.X > maxWidth {
-				gtx.Constraints.Max.X = maxWidth
-				gtx.Constraints.Min.X = maxWidth
-			}
-
-			if u.usUI.mode == usViewEditor {
-				return u.layoutUserscriptEditor(gtx)
-			}
-			return u.layoutUserscriptList(gtx)
-		})
-	})
+	if u.settings.us.mode == usViewEditor {
+		return u.layoutUserscriptEditor(gtx)
+	}
+	return u.layoutUserscriptList(gtx)
 }
 
 // handleUserscriptEvents 处理用户脚本面板交互事件。
 func (u *UI) handleUserscriptEvents(gtx layout.Context) {
-	st := &u.usUI
+	st := &u.settings.us
 	mgr := userscript.GetGlobalManager()
-
-	if st.closeBtn.Clicked(gtx) {
-		u.showUserscripts = false
-		u.b.SetSettingsOpen(false)
-		return
-	}
 
 	if st.newBtn.Clicked(gtx) {
 		st.mode = usViewEditor
@@ -174,11 +142,21 @@ func (u *UI) layoutUserscriptList(gtx layout.Context) layout.Dimensions {
 	scripts := mgr.List()
 
 	items := []layout.Widget{
-		// 1. 顶部 Header
+		// 1. 面板标题与新建操作
 		func(gtx layout.Context) layout.Dimensions {
 			return u.layoutUserscriptHeader(gtx)
 		},
-		spacerVertical(14),
+		spacerVertical(12),
+		// 状态行
+		func(gtx layout.Context) layout.Dimensions {
+			if u.settings.us.statusMsg == "" {
+				return layout.Dimensions{}
+			}
+			lbl := material.Label(u.theme, unit.Sp(10), u.settings.us.statusMsg)
+			lbl.Color = CAccentGreen
+			return lbl.Layout(gtx)
+		},
+		spacerVertical(4),
 	}
 
 	// 2. 脚本卡片列表
@@ -189,62 +167,51 @@ func (u *UI) layoutUserscriptList(gtx layout.Context) layout.Dimensions {
 		}, spacerVertical(10))
 	}
 
-	return u.usUI.list.Layout(gtx, len(items), func(gtx layout.Context, index int) layout.Dimensions {
+	return u.settings.us.list.Layout(gtx, len(items), func(gtx layout.Context, index int) layout.Dimensions {
 		return items[index](gtx)
 	})
 }
 
-// layoutUserscriptHeader 列表顶部标题栏与新建操作。
+// layoutUserscriptHeader 面板标题行与新建操作。
 func (u *UI) layoutUserscriptHeader(gtx layout.Context) layout.Dimensions {
 	return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
+			return glyph(gtx, iconExtension, 18, CAccent)
+		}),
+		layout.Rigid(spacer(8)),
+		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+			return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return glyph(gtx, iconExtension, 20, CAccent)
+					lbl := material.Label(u.theme, unit.Sp(14), "用户脚本（篡改猴）")
+					lbl.Color = CTabActiveText
+					return lbl.Layout(gtx)
 				}),
-				layout.Rigid(spacer(10)),
+				layout.Rigid(spacerVertical(2)),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							lbl := material.Label(u.theme, unit.Sp(17), "篡改猴 · 用户脚本管理中心")
-							lbl.Color = CTabActiveText
-							return lbl.Layout(gtx)
-						}),
-						layout.Rigid(spacerVertical(2)),
-						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							lbl := material.Label(u.theme, unit.Sp(11), "在匹配的网页中注入执行自定义 JavaScript，扩展网页功能与去限制")
-							lbl.Color = CEditorHint
-							return lbl.Layout(gtx)
-						}),
-					)
+					lbl := material.Label(u.theme, unit.Sp(10), "在匹配的网页中注入执行自定义 JavaScript，扩展网页功能与去限制")
+					lbl.Color = CEditorHint
+					return lbl.Layout(gtx)
 				}),
 			)
 		}),
 		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
 			return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: 0}}
 		}),
-		// 新建脚本按钮（矢量加号图标，emoji 会缺字渲染为方块）
+		// 新建脚本按钮（矢量加号图标）
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return iconLabelButton(gtx, u.theme, &u.usUI.newBtn,
+			return iconLabelButton(gtx, u.theme, &u.settings.us.newBtn,
 				iconAdd, "新建脚本",
-				CAccent, COnAccent, unit.Sp(13), 13, 6, 14)
-		}),
-		layout.Rigid(spacer(8)),
-		// 返回网页按钮
-		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			return iconLabelButton(gtx, u.theme, &u.usUI.closeBtn,
-				iconClose, "返回网页",
-				CBtnBG, CBtnFG, unit.Sp(13), 12, 6, 14)
+				CAccent, COnAccent, unit.Sp(12), 12, 5, 12)
 		}),
 	)
 }
 
 // layoutScriptCard 渲染单个用户脚本卡片。
 func (u *UI) layoutScriptCard(gtx layout.Context, s *userscript.Script) layout.Dimensions {
-	ctl := u.usUI.cards[s.ID]
+	ctl := u.settings.us.cards[s.ID]
 	if ctl == nil {
 		ctl = &scriptCardCtl{}
-		u.usUI.cards[s.ID] = ctl
+		u.settings.us.cards[s.ID] = ctl
 	}
 
 	return u.cardBox(gtx, func(gtx layout.Context) layout.Dimensions {
@@ -357,8 +324,8 @@ func (u *UI) layoutScriptCard(gtx layout.Context, s *userscript.Script) layout.D
 // layoutUserscriptEditor 渲染在线代码编辑器视图。
 func (u *UI) layoutUserscriptEditor(gtx layout.Context) layout.Dimensions {
 	title := "新建用户脚本"
-	if u.usUI.editingID != "" {
-		if s, ok := userscript.GetGlobalManager().Get(u.usUI.editingID); ok {
+	if u.settings.us.editingID != "" {
+		if s, ok := userscript.GetGlobalManager().Get(u.settings.us.editingID); ok {
 			title = "编辑用户脚本: " + s.Meta.Name
 		}
 	}
@@ -381,14 +348,14 @@ func (u *UI) layoutUserscriptEditor(gtx layout.Context) layout.Dimensions {
 				}),
 				// 保存按钮（矢量保存图标）
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return iconLabelButton(gtx, u.theme, &u.usUI.saveCodeBtn,
+					return iconLabelButton(gtx, u.theme, &u.settings.us.saveCodeBtn,
 						iconSave, "保存脚本",
 						CAccent, COnAccent, unit.Sp(13), 13, 6, 14)
 				}),
 				layout.Rigid(spacer(8)),
 				// 取消返回列表
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					btn := material.Button(u.theme, &u.usUI.backListBtn, "取消")
+					btn := material.Button(u.theme, &u.settings.us.backListBtn, "取消")
 					btn.Background = CBtnBG
 					btn.Color = CBtnFG
 					btn.Inset = layout.Inset{Top: unit.Dp(6), Bottom: unit.Dp(6), Left: unit.Dp(12), Right: unit.Dp(12)}
@@ -413,7 +380,7 @@ func (u *UI) layoutUserscriptEditor(gtx layout.Context) layout.Dimensions {
 					}),
 					layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 						return layout.UniformInset(unit.Dp(12)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							ed := material.Editor(u.theme, &u.usUI.codeEditor, "请输入 JavaScript 用户脚本代码...")
+							ed := material.Editor(u.theme, &u.settings.us.codeEditor, "请输入 JavaScript 用户脚本代码...")
 							ed.Color = CEditorFG
 							ed.HintColor = CEditorHint
 							ed.TextSize = unit.Sp(12)

@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"gioui.org/layout"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -29,7 +27,6 @@ type extensionsUIState struct {
 
 	pathEditor widget.Editor
 	loadBtn    widget.Clickable
-	closeBtn   widget.Clickable
 
 	cards map[string]*extCardCtl
 
@@ -37,49 +34,20 @@ type extensionsUIState struct {
 	statusTime time.Time
 }
 
-func (u *UI) initExtensionsUIState() {
-	u.extUI = extensionsUIState{
-		cards: make(map[string]*extCardCtl),
-	}
-	u.extUI.list.Axis = layout.Vertical
-}
-
-// LayoutExtensions 渲染扩展管理面板主体（参考 Edge edge://extensions 的
-// 开发者模式形态，v1 以路径输入代替系统文件夹选择对话框）。
-func (u *UI) LayoutExtensions(gtx layout.Context) layout.Dimensions {
+// layoutExtensionPanel 渲染扩展管理面板（由设置中心右区调用）。
+func (u *UI) layoutExtensionPanel(gtx layout.Context) layout.Dimensions {
 	u.handleExtensionEvents(gtx)
-
-	paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
-
-	return layout.Inset{
-		Top: unit.Dp(16), Bottom: unit.Dp(16),
-		Left: unit.Dp(24), Right: unit.Dp(24),
-	}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-		return layout.Center.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-			maxWidth := gtx.Dp(unit.Dp(760))
-			if gtx.Constraints.Max.X > maxWidth {
-				gtx.Constraints.Max.X = maxWidth
-				gtx.Constraints.Min.X = maxWidth
-			}
-			return u.layoutExtensionList(gtx)
-		})
-	})
+	return u.layoutExtensionList(gtx)
 }
 
 // handleExtensionEvents 处理扩展面板交互事件。
 func (u *UI) handleExtensionEvents(gtx layout.Context) {
-	st := &u.extUI
+	st := &u.settings.ext
 	mgr := extension.GetGlobalManager()
 
 	setStatus := func(format string, args ...any) {
 		st.statusMsg = fmt.Sprintf(format, args...)
 		st.statusTime = time.Now()
-	}
-
-	if st.closeBtn.Clicked(gtx) {
-		u.showExtensions = false
-		u.b.SetSettingsOpen(false)
-		return
 	}
 
 	if st.loadBtn.Clicked(gtx) {
@@ -145,7 +113,7 @@ func (u *UI) layoutExtensionList(gtx layout.Context) layout.Dimensions {
 		}, spacerVertical(10))
 	}
 
-	return u.extUI.list.Layout(gtx, len(items), func(gtx layout.Context, index int) layout.Dimensions {
+	return u.settings.ext.list.Layout(gtx, len(items), func(gtx layout.Context, index int) layout.Dimensions {
 		return items[index](gtx)
 	})
 }
@@ -157,19 +125,19 @@ func (u *UI) layoutExtensionHeader(gtx layout.Context) layout.Dimensions {
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			return layout.Flex{Axis: layout.Horizontal, Alignment: layout.Middle}.Layout(gtx,
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return glyph(gtx, iconExtensions, 20, CAccent)
+					return glyph(gtx, iconExtensions, 18, CAccent)
 				}),
-				layout.Rigid(spacer(10)),
+				layout.Rigid(spacer(8)),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 					return layout.Flex{Axis: layout.Vertical}.Layout(gtx,
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							lbl := material.Label(u.theme, unit.Sp(17), "扩展管理 · 开发者模式")
+							lbl := material.Label(u.theme, unit.Sp(14), "扩展（开发者模式）")
 							lbl.Color = CTabActiveText
 							return lbl.Layout(gtx)
 						}),
 						layout.Rigid(spacerVertical(2)),
 						layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-							lbl := material.Label(u.theme, unit.Sp(11), "加载已解压的 Chrome/Edge 扩展目录，content_scripts 自动注入匹配页面")
+							lbl := material.Label(u.theme, unit.Sp(10), "加载已解压的 Chrome/Edge 扩展目录，content_scripts 自动注入匹配页面")
 							lbl.Color = CEditorHint
 							return lbl.Layout(gtx)
 						}),
@@ -177,11 +145,6 @@ func (u *UI) layoutExtensionHeader(gtx layout.Context) layout.Dimensions {
 				}),
 				layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
 					return layout.Dimensions{Size: image.Point{X: gtx.Constraints.Max.X, Y: 0}}
-				}),
-				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return iconLabelButton(gtx, u.theme, &u.extUI.closeBtn,
-						iconClose, "返回网页",
-						CBtnBG, CBtnFG, unit.Sp(13), 12, 6, 14)
 				}),
 			)
 		}),
@@ -197,7 +160,7 @@ func (u *UI) layoutExtensionHeader(gtx layout.Context) layout.Dimensions {
 					}
 					return border.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 						return layout.UniformInset(unit.Dp(7)).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-							ed := material.Editor(u.theme, &u.extUI.pathEditor, "输入已解压扩展的目录路径，如 D:\\extensions\\my-ext")
+							ed := material.Editor(u.theme, &u.settings.ext.pathEditor, "输入已解压扩展的目录路径，如 D:\\extensions\\my-ext")
 							ed.Color = CEditorFG
 							ed.HintColor = CEditorHint
 							return ed.Layout(gtx)
@@ -206,7 +169,7 @@ func (u *UI) layoutExtensionHeader(gtx layout.Context) layout.Dimensions {
 				}),
 				layout.Rigid(spacer(8)),
 				layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-					return iconLabelButton(gtx, u.theme, &u.extUI.loadBtn,
+					return iconLabelButton(gtx, u.theme, &u.settings.ext.loadBtn,
 						iconAdd, "加载扩展",
 						CAccent, COnAccent, unit.Sp(13), 13, 7, 14)
 				}),
@@ -215,10 +178,10 @@ func (u *UI) layoutExtensionHeader(gtx layout.Context) layout.Dimensions {
 		layout.Rigid(spacerVertical(4)),
 		// 状态消息行
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-			if u.extUI.statusMsg == "" {
+			if u.settings.ext.statusMsg == "" {
 				return layout.Dimensions{}
 			}
-			lbl := material.Label(u.theme, unit.Sp(11), u.extUI.statusMsg)
+			lbl := material.Label(u.theme, unit.Sp(11), u.settings.ext.statusMsg)
 			lbl.Color = CEditorHint
 			return lbl.Layout(gtx)
 		}),
@@ -227,10 +190,10 @@ func (u *UI) layoutExtensionHeader(gtx layout.Context) layout.Dimensions {
 
 // layoutExtensionCard 渲染单个扩展卡片。
 func (u *UI) layoutExtensionCard(gtx layout.Context, e *extension.Extension) layout.Dimensions {
-	ctl := u.extUI.cards[e.ID]
+	ctl := u.settings.ext.cards[e.ID]
 	if ctl == nil {
 		ctl = &extCardCtl{}
-		u.extUI.cards[e.ID] = ctl
+		u.settings.ext.cards[e.ID] = ctl
 	}
 
 	return u.cardBox(gtx, func(gtx layout.Context) layout.Dimensions {

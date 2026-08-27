@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"syscall"
@@ -61,8 +62,32 @@ func New() *Manager {
 	return &Manager{views: make(map[string]*tabView)}
 }
 
+// settingsURLPrefix 设置中心标签页地址前缀：此类标签不承载 WebView，
+// 由宿主 Gio 直接绘制（地址约定见 browser.SettingsURL）。
+const settingsURLPrefix = "gio://"
+
 // CreateTab 为指定标签页创建独立存活的原生 WebView2 实例并导航到 url。
 func (m *Manager) CreateTab(tabID, url string) {
+	if strings.HasPrefix(url, settingsURLPrefix) {
+		// 宿主标签页（如设置中心）不创建渲染实例，但需完成"新建即激活"：
+		// 切换 activeTabID 并隐藏当前可见视图，露出 Gio 绘制的内容
+		m.dispatch(func() {
+			m.mu.Lock()
+			prev := m.views[m.activeTabID]
+			m.activeTabID = tabID
+			m.mu.Unlock()
+
+			if prev != nil {
+				if prev.Chromium != nil {
+					_ = prev.Chromium.Hide()
+				}
+				if prev.childHWND != 0 {
+					win32.Hide(prev.childHWND)
+				}
+			}
+		})
+		return
+	}
 	m.dispatch(func() { m.createTabLocked(tabID, url) })
 }
 
@@ -253,6 +278,9 @@ func (m *Manager) CloseTab(tabID string) {
 		}
 		m.mu.Unlock()
 
+		if view == nil {
+			return // 宿主标签页（如设置中心）本无渲染实例
+		}
 		win32.DestroyWindow(view.childHWND)
 	})
 }

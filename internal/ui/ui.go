@@ -32,9 +32,8 @@ type tabCtl struct {
 	close widget.Clickable
 }
 
-// bmCtl 单个书签按钮。
+// bmCtl 快捷访问按钮控件（按条目内容缓存复用）。
 type bmCtl struct {
-	data  browser.Bookmark
 	click widget.Clickable
 }
 
@@ -51,45 +50,39 @@ type UI struct {
 	maximized bool
 
 	// 工具栏
-	newTabBtn      widget.Clickable
-	backBtn        widget.Clickable
-	forwardBtn     widget.Clickable
-	reloadBtn      widget.Clickable
-	homeBtn        widget.Clickable
-	goBtn          widget.Clickable
-	settingsBtn    widget.Clickable
-	userscriptsBtn widget.Clickable
-	extensionsBtn  widget.Clickable
-	procBtn        widget.Clickable
-	urlEditor      widget.Editor
+	newTabBtn     widget.Clickable
+	backBtn       widget.Clickable
+	forwardBtn    widget.Clickable
+	reloadBtn     widget.Clickable
+	homeBtn       widget.Clickable
+	goBtn         widget.Clickable
+	settingsBtn   widget.Clickable
+	procBtn       widget.Clickable
+	urlEditor     widget.Editor
 
 	// OnOpenProcessManager 由装配层注入：点击工具栏进程按钮时打开
 	// 进程管理浮窗（可为 nil，按钮点击则无效果）。
 	OnOpenProcessManager func()
 
-	// 设置页面、用户脚本与扩展面板状态
-	showSettings    bool
-	settings        settingsState
-	showUserscripts bool
-	usUI            userscriptUIState
-	showExtensions  bool
-	extUI           extensionsUIState
+	// 设置中心（活跃标签为 gio://settings 时渲染于内容区）
+	settings settingsUI
 
 	// 动态控件集合
 	tabCtls map[string]*tabCtl
-	bmCtls  []*bmCtl
+	bmCtls  map[string]*bmCtl
 
 	// 地址栏与当前页 URL 的同步水位
 	lastSyncedURL string
 }
 
-// New 构建界面并从模型读取初始书签列表。
+// New 构建界面并从模型读取初始地址。
 func New(th *material.Theme, b *browser.Browser, win *app.Window) *UI {
 	u := &UI{
 		theme:   th,
 		b:       b,
 		win:     win,
 		tabCtls: make(map[string]*tabCtl),
+		bmCtls:  make(map[string]*bmCtl),
 	}
 	u.urlEditor.SingleLine = true
 	u.urlEditor.Submit = true
@@ -97,12 +90,7 @@ func New(th *material.Theme, b *browser.Browser, win *app.Window) *UI {
 		u.urlEditor.SetText(t.URL)
 		u.lastSyncedURL = t.URL
 	}
-	for _, bm := range b.Bookmarks() {
-		u.bmCtls = append(u.bmCtls, &bmCtl{data: bm})
-	}
 	u.initSettingsState()
-	u.initUserscriptsUIState()
-	u.initExtensionsUIState()
 	return u
 }
 
@@ -137,20 +125,14 @@ func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
 			top += dims.Size.Y
 			return dims
 		}),
-			// 页面内容区占位（浏览时 WebView2 覆盖在此之上；打开扩展/设置/篡改猴时由 Gio 绘制对应面板）
-			layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
-				if u.showUserscripts {
-					return u.LayoutUserscripts(gtx)
-				}
-				if u.showExtensions {
-					return u.LayoutExtensions(gtx)
-				}
-				if u.showSettings {
-					return u.LayoutSettings(gtx)
-				}
-				paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
-				return layout.Dimensions{Size: gtx.Constraints.Max}
-			}),
+		// 页面内容区：普通标签由 WebView2 覆盖；设置标签渲染设置中心
+		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
+			if u.b.IsViewingSettings() {
+				return u.LayoutSettingsHub(gtx)
+			}
+			paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
+			return layout.Dimensions{Size: gtx.Constraints.Max}
+		}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			dims := background(gtx, CStatusBG, func(gtx layout.Context) layout.Dimensions {
 				return u.LayoutStatusBar(gtx)

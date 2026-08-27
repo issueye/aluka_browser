@@ -24,10 +24,6 @@ func (u *UI) LayoutTabBar(gtx layout.Context) layout.Dimensions {
 	u.handleWindowControls(gtx)
 
 	if u.newTabBtn.Clicked(gtx) {
-		if u.showSettings {
-			u.showSettings = false
-			u.b.SetSettingsOpen(false)
-		}
 		u.b.CreateTab("", "新标签页")
 	}
 
@@ -47,10 +43,6 @@ func (u *UI) LayoutTabBar(gtx layout.Context) layout.Dimensions {
 			break
 		}
 		if ctl.click.Clicked(gtx) {
-			if u.showSettings {
-				u.showSettings = false
-				u.b.SetSettingsOpen(false)
-			}
 			u.b.SwitchTab(i)
 			break
 		}
@@ -93,7 +85,7 @@ func (u *UI) LayoutTabBar(gtx layout.Context) layout.Dimensions {
 			u.tabCtls[tab.ID] = ctl
 		}
 
-		children = append(children, u.tabChild(tab, idx == activeIdx && !u.showSettings, ctl))
+		children = append(children, u.tabChild(tab, idx == activeIdx, ctl))
 	}
 
 	// 3. ＋ 新建标签按钮

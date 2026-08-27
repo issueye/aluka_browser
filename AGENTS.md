@@ -55,6 +55,8 @@ webview / ui ─→ win32(syscall 封装)
 ## 关键行为约定（有测试锁定，勿破坏）
 
 - 标签页至少保留一个：关闭最后一个标签 = 导航回主页（`browser.CloseTab`）。
+- gio `layout.List` 的**零值轴是横向**（`Horizontal`），凡新增 List 字段必须在初始化处显式 `Axis = layout.Vertical`，否则面板会横向流式排布。
+- 设置中心是特殊标签页（`browser.SettingsURL` = `gio://settings`）：`webview.Manager.CreateTab` 对该前缀**不创建渲染实例**（但完成"新建即激活"语义），`CloseTab` 对无视图标签安全返回；活跃设置标签时 `NavigateActive` 忽略导航。UI 侧以 `b.IsViewingSettings()` 分支渲染 `LayoutSettingsHub`（左导航 + 右内容）。
 - 切换到已活跃标签不做任何事，绝不触发刷新（`browser.SwitchTab`）。
 - 后台标签只 Hide 子窗口，不销毁实例（保持滚动位置与 JS 状态）。
 - 地址栏输入归一化：带协议直接用；含 `.` 无空格补 `https://`；纯数字端口形式视为网址；否则送 DuckDuckGo 搜索（`browser.NormalizeInputURL`）。
@@ -68,11 +70,12 @@ webview / ui ─→ win32(syscall 封装)
 
 | 位置 | 内容 | 访问入口 |
 |---|---|---|
-| `%APPDATA%\gio-browser\config.json` | 代理配置 | `config.Load / Current / Save` |
+| `%APPDATA%\gio-browser\config.json` | 主页地址、快捷访问列表 | `config.Load / Current / Save` |
 | `%APPDATA%\gio-browser\userscripts.json` | 用户脚本集合 | `userscript.GetGlobalManager()`（sync.Once 单例） |
+| `%APPDATA%\gio-browser\extensions\extensions.json` | 已加载扩展注册表 | `extension.GetGlobalManager()` |
 | `%TEMP%\gio_browser_profile` | WebView2 共享数据目录 | — |
 
-代理变更的生效路径：`config.Save` → `applyProxyEnvLocked` 设置 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS`（需重启应用对已建实例生效的语义要留意）。
+网络代理功能已移除（规划由扩展实现）；`config.Config` 现为 `{home_page, quick_links}`。
 
 ## 代码风格
 

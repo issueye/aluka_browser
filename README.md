@@ -10,13 +10,14 @@
 - **多标签页**：每个标签页拥有独立的 WebView2 渲染实例，后台标签只隐藏不销毁——保留运行状态与滚动位置，切换零成本重载。
 - **地址栏智能归一化**：自动补全协议、识别 `host:port`，非网址输入转为 DuckDuckGo 搜索。
 - **新窗口拦截**：`window.open`、`target=_blank`、中键/Ctrl+点击均被拦截转为新标签页。
-- **快捷书签栏**：内置 GitHub / Google / Bilibili / MDN / HackerNews。
-- **网络代理设置**：支持 HTTP / SOCKS5 代理及白名单绕过，通过 Chromium 启动参数全局生效。
+- **快捷访问栏**：条目由配置驱动，可在设置中心「快捷访问」中增删，即时生效。
+- **设置中心标签页**：以 `gio://settings` 标签呈现（左侧导航 + 右侧内容），聚合主页设置、快捷访问管理、用户脚本（篡改猴）与扩展管理。
+- **主页可配置**：主页地址持久化到配置，新标签页、回主页与关闭最后一个标签均使用该地址。
 - **用户脚本管理器**：类篡改猴体验——元数据解析、URL 匹配、启停开关、在线编辑、本地持久化，并预置三个实用脚本（暗黑模式 / 解除复制限制 / 回到顶部悬浮球）。
 - **扩展系统（开发者模式）**：参考 Chrome/Edge 的"加载已解压扩展"——解析 manifest.json（MV2/MV3）、content_scripts 自动注入、chrome.runtime/storage 最小兼容沙箱、扩展管理面板。
 - **进程管理浮窗**：独立置顶小窗展示全系统进程树（父子缩进、内存占用、按名过滤、2s 自动刷新），高亮浏览器自身子树（含各标签的 msedgewebview2 进程族），子树内支持一键结束进程。
 - **后台标签内存优化**：后台标签切走时即停止渲染活动；空闲超过阈值后自动对浏览器进程树做工作集裁剪，实测多标签场景物理内存可压缩 **-85%**（3 标签 559MB → 190MB），切回标签页面按需恢复、状态无损。阈值可用环境变量 `GIO_SUSPEND_AFTER_SEC`（秒，默认 180）调节；`GIO_SUSPEND_MODE=api` 可切换为实验性的 TrySuspendAsync 挂起路径（部分运行时版本存在崩溃问题，见 AGENTS.md）。
-- **Agent 动作分发层**：16 个结构化动作（导航/标签/代理/用户脚本管理），纯 Go 实现，可直接对接大模型 Function Calling 或自动化编排，无需嵌入任何脚本运行时。
+- **Agent 动作分发层**：14 个结构化动作（导航/标签/用户脚本管理），纯 Go 实现，可直接对接大模型 Function Calling 或自动化编排，无需嵌入任何脚本运行时。
 
 ## 架构
 
@@ -46,7 +47,7 @@
 │                      指令转发到各领域模型           │
 │ internal/userscript  UserScript 解析/匹配/GM_*    │
 │                      沙箱/JSON 存储                 │
-│ internal/config      配置持久化 + 代理环境变量      │
+│ internal/config      配置持久化（主页/快捷访问）         │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -68,7 +69,7 @@ main.go                        入口
 internal/
 ├── app/                       应用装配、事件循环、应用图标
 ├── browser/                   标签页状态机、Engine 接口、URL 归一化
-├── config/                    配置持久化（%APPDATA%）、代理参数生成
+├── config/                    配置持久化（主页、快捷访问）
 ├── scripting/                 Agent 动作分发器（纯 Go，无运行时依赖）
 ├── extension/                 Chrome/Edge 式扩展：manifest/注册表/注入/chrome.* 沙箱
 ├── procs/                     进程快照与树构建（纯逻辑，可独立测试）
@@ -132,11 +133,11 @@ go test ./...
 
 | 文件 | 内容 |
 |---|---|
-| `config.json` | 代理开关、代理类型（http/socks5）、服务器地址、绕过白名单 |
+| `config.json` | 主页地址、快捷访问列表（名称 + URL） |
 | `userscripts.json` | 用户脚本集合（代码原文 + 解析后的元数据 + 启用状态） |
+| `extensions/extensions.json` | 已加载扩展注册表 |
 
-代理配置通过环境变量 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 注入为
-`--proxy-server=… --proxy-bypass-list=…`，对所有 WebView2 页面全局生效。
+网络代理功能已移除，规划中将通过扩展机制实现。
 
 ## 用户脚本系统
 
@@ -187,7 +188,6 @@ go test ./...
 | `get_tabs` / `list_tabs` | — | 全部标签信息（含 active 标记） |
 | `page_eval` / `eval_js` | `script` | 在当前网页内执行 JavaScript |
 | `go_back` / `go_forward` / `reload` | — | 导航控制 |
-| `get_proxy` / `set_proxy` | `enabled/server/bypass/type` | 代理查询与配置 |
 | `list_userscripts` / `add_userscript` / `toggle_userscript` / `delete_userscript` | 见源码 | 用户脚本管理 |
 
 Go 调用示例：

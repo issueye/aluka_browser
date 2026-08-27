@@ -7,12 +7,24 @@ package browser
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
 
 // DefaultTabID 初始标签页的固定 ID。
 const DefaultTabID = "tab-default-1"
+
+// SettingsURL 设置中心标签页的固定地址（不承载 WebView，由 Gio 绘制）。
+const SettingsURL = "gio://settings"
+
+// SettingsTitle 设置中心标签页标题。
+const SettingsTitle = "设置"
+
+// IsSettingsURL 判断地址是否为设置中心标签页。
+func IsSettingsURL(url string) bool {
+	return strings.HasPrefix(url, SettingsURL)
+}
 
 // Tab 标签页的纯数据模型（不包含任何控件状态）。
 type Tab struct {
@@ -21,7 +33,7 @@ type Tab struct {
 	URL   string
 }
 
-// Bookmark 快捷书签。
+// Bookmark 快捷访问条目（快捷访问栏与设置中心共用）。
 type Bookmark struct {
 	Name string
 	URL  string
@@ -49,23 +61,65 @@ type Browser struct {
 	status       string
 	loading      bool
 	bookmark     []Bookmark
-	settingsOpen bool
+	homePage     string
 }
 
 // New 创建浏览器并置入一个默认标签页。engine 允许为 nil（用于测试）。
+// 主页与快捷访问初始为空，由装配层注入持久化值（见 SetHomePage/AddQuickLink）。
 func New(engine Engine) *Browser {
 	return &Browser{
-		engine: engine,
-		tabs:   []*Tab{{ID: DefaultTabID, Title: "GitHub", URL: HomeURL}},
-		status: "就绪",
-		bookmark: []Bookmark{
-			{Name: "GitHub", URL: "https://github.com"},
-			{Name: "Google", URL: "https://www.google.com"},
-			{Name: "Bilibili", URL: "https://www.bilibili.com"},
-			{Name: "MDN Web", URL: "https://developer.mozilla.org"},
-			{Name: "HackerNews", URL: "https://news.ycombinator.com"},
-		},
+		engine:   engine,
+		tabs:     []*Tab{{ID: DefaultTabID, Title: "主页", URL: HomeURL}},
+		status:   "就绪",
+		homePage: HomeURL,
 	}
+}
+
+// ---- 主页与快捷访问 ----
+
+// HomePage 返回当前生效的主页地址。
+func (b *Browser) HomePage() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.homePage == "" {
+		return HomeURL
+	}
+	return b.homePage
+}
+
+// SetHomePage 设置主页地址（仅内存态，持久化由调用方写配置）。
+func (b *Browser) SetHomePage(home string) {
+	home = strings.TrimSpace(home)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if home == "" {
+		home = HomeURL
+	}
+	b.homePage = home
+}
+
+// AddQuickLink 追加快捷访问条目（仅内存态）；名称或地址为空时忽略。
+func (b *Browser) AddQuickLink(name, url string) (Bookmark, bool) {
+	name, url = strings.TrimSpace(name), strings.TrimSpace(url)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if name == "" || url == "" {
+		return Bookmark{}, false
+	}
+	bm := Bookmark{Name: name, URL: url}
+	b.bookmark = append(b.bookmark, bm)
+	return bm, true
+}
+
+// RemoveQuickLink 删除指定下标的快捷访问条目；下标非法返回 false。
+func (b *Browser) RemoveQuickLink(i int) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if i < 0 || i >= len(b.bookmark) {
+		return false
+	}
+	b.bookmark = append(b.bookmark[:i], b.bookmark[i+1:]...)
+	return true
 }
 
 // ---- 只读访问 ----
@@ -136,7 +190,7 @@ func (b *Browser) Bookmarks() []Bookmark {
 // CreateTab 新建标签页并立即激活。url 为空时打开主页。
 func (b *Browser) CreateTab(url, title string) {
 	if url == "" {
-		url = HomeURL
+		url = b.HomePage()
 	}
 	if title == "" {
 		title = "新标签页"
@@ -184,12 +238,16 @@ func (b *Browser) CloseTab(i int) {
 	engine := b.engine
 
 	if len(b.tabs) == 1 {
-		b.tabs[0].URL = HomeURL
-		b.tabs[0].Title = "GitHub"
+		home := b.homePage // 持锁期间直接读字段；b.HomePage() 会重入加锁死锁
+		if home == "" {
+			home = HomeURL
+		}
+		b.tabs[0].URL = home
+		b.tabs[0].Title = "主页"
 		b.mu.Unlock()
 
 		if engine != nil {
-			engine.Navigate(closing.ID, HomeURL)
+			engine.Navigate(closing.ID, home)
 		}
 		return
 	}
@@ -208,28 +266,30 @@ func (b *Browser) CloseTab(i int) {
 }
 
 // NavigateActive 将当前活跃标签页导航到 url 并同步模型状态。
+// 活跃标签为设置中心时忽略导航（设置页不承载网页）。
 func (b *Browser) NavigateActive(url string) {
 	b.mu.Lock()
-	if url != "" && b.active < len(b.tabs) {
-		b.tabs[b.active].URL = url
+	if b.active >= len(b.tabs) {
+		b.mu.Unlock()
+		return
 	}
-	tabID := b.tabs[b.active].ID
+	tab := b.tabs[b.active]
+	if IsSettingsURL(tab.URL) || url == "" {
+		b.mu.Unlock()
+		return
+	}
+	tab.URL = url
 	engine := b.engine
 	b.mu.Unlock()
 
-	if engine != nil && url != "" {
-		engine.Navigate(tabID, url)
+	if engine != nil {
+		engine.Navigate(tab.ID, url)
 	}
 }
 
 // GoHome 返回主页。
 func (b *Browser) GoHome() {
-	b.NavigateActive(HomeURL)
-	b.mu.Lock()
-	if b.active < len(b.tabs) {
-		b.tabs[b.active].Title = "GitHub"
-	}
-	b.mu.Unlock()
+	b.NavigateActive(b.HomePage())
 }
 
 // GoBack / GoForward / Reload 委托给引擎操作当前活跃页。
@@ -312,21 +372,25 @@ func (b *Browser) SetPageLoading(loading bool, url string) {
 	}
 }
 
-// SettingsOpen 返回当前是否正处于设置页面。
-func (b *Browser) SettingsOpen() bool {
+// ---- 设置中心标签页 ----
+
+// OpenSettings 打开设置中心：已存在则激活，否则新建设置标签并激活。
+func (b *Browser) OpenSettings() {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.settingsOpen
+	for i, t := range b.tabs {
+		if IsSettingsURL(t.URL) {
+			b.mu.Unlock()
+			b.SwitchTab(i) // 已是活跃标签时为安全空操作
+			return
+		}
+	}
+	b.mu.Unlock()
+	b.CreateTab(SettingsURL, SettingsTitle)
 }
 
-// SetSettingsOpen 设置是否打开设置页，并联动通知引擎显隐。
-func (b *Browser) SetSettingsOpen(open bool) {
+// IsViewingSettings 当前活跃标签是否为设置中心。
+func (b *Browser) IsViewingSettings() bool {
 	b.mu.Lock()
-	b.settingsOpen = open
-	engine := b.engine
-	b.mu.Unlock()
-
-	if engine != nil {
-		engine.SetVisible(!open)
-	}
+	defer b.mu.Unlock()
+	return b.active < len(b.tabs) && IsSettingsURL(b.tabs[b.active].URL)
 }

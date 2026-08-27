@@ -27,8 +27,8 @@ func Main() { gioapp.Main() }
 
 // Run 创建窗口并进入主事件循环，窗口关闭时返回。
 func Run() error {
-	// 加载用户本地配置并初始化网络代理环境变量
-	config.Load()
+	// 加载用户本地配置（主页、快捷访问）
+	cfg := config.Load()
 
 	win := new(gioapp.Window)
 	win.Option(
@@ -41,6 +41,10 @@ func Run() error {
 	th := material.NewTheme()
 	engine := webview.New()
 	b := browser.New(engine)
+	b.SetHomePage(cfg.HomePage)
+	for _, l := range cfg.QuickLinks {
+		b.AddQuickLink(l.Name, l.URL)
+	}
 	u := ui.New(th, b, win)
 
 	// 进程管理浮窗：同一时刻仅允许一个实例
@@ -128,7 +132,7 @@ func startEngineAsync(titleSubstr string, engine *webview.Manager, b *browser.Br
 				},
 			)
 
-			engine.CreateTab(browser.DefaultTabID, browser.HomeURL)
+			engine.CreateTab(browser.DefaultTabID, b.HomePage())
 
 			mu.Lock()
 			found = true

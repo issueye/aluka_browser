@@ -28,29 +28,7 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 	case u.goBtn.Clicked(gtx):
 		u.submitAddress(gtx)
 	case u.settingsBtn.Clicked(gtx):
-		u.showSettings = !u.showSettings
-		if u.showSettings {
-			u.showUserscripts = false
-			u.showExtensions = false
-			u.initSettingsState()
-		}
-		u.b.SetSettingsOpen(u.showSettings || u.showUserscripts || u.showExtensions)
-	case u.userscriptsBtn.Clicked(gtx):
-		u.showUserscripts = !u.showUserscripts
-		if u.showUserscripts {
-			u.showSettings = false
-			u.showExtensions = false
-			u.initUserscriptsUIState()
-		}
-		u.b.SetSettingsOpen(u.showUserscripts || u.showSettings || u.showExtensions)
-	case u.extensionsBtn.Clicked(gtx):
-		u.showExtensions = !u.showExtensions
-		if u.showExtensions {
-			u.showSettings = false
-			u.showUserscripts = false
-			u.initExtensionsUIState()
-		}
-		u.b.SetSettingsOpen(u.showExtensions || u.showUserscripts || u.showSettings)
+		u.b.OpenSettings()
 	case u.procBtn.Clicked(gtx):
 		if u.OnOpenProcessManager != nil {
 			u.OnOpenProcessManager()
@@ -119,36 +97,6 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(spacer(8)),
-			// 篡改猴 / 用户脚本中心按钮 🧩
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				btn := material.IconButton(u.theme, &u.userscriptsBtn, iconExtension, "用户脚本中心")
-				if u.showUserscripts {
-					btn.Background = CAccent
-					btn.Color = COnAccent
-				} else {
-					btn.Background = CBtnBG
-					btn.Color = CBtnFG
-				}
-				btn.Size = unit.Dp(18)
-				btn.Inset = layout.UniformInset(unit.Dp(7))
-				return btn.Layout(gtx)
-			}),
-			layout.Rigid(spacer(6)),
-			// 扩展管理按钮（拼图已被用户脚本中心占用，改用拼贴图标）
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				btn := material.IconButton(u.theme, &u.extensionsBtn, iconExtensions, "扩展管理")
-				if u.showExtensions {
-					btn.Background = CAccent
-					btn.Color = COnAccent
-				} else {
-					btn.Background = CBtnBG
-					btn.Color = CBtnFG
-				}
-				btn.Size = unit.Dp(18)
-				btn.Inset = layout.UniformInset(unit.Dp(7))
-				return btn.Layout(gtx)
-			}),
-			layout.Rigid(spacer(6)),
 			// 进程管理浮窗按钮
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				btn := material.IconButton(u.theme, &u.procBtn, iconProc, "进程管理")
@@ -159,16 +107,11 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 				return btn.Layout(gtx)
 			}),
 			layout.Rigid(spacer(6)),
-			// 设置按钮 ⚙️（放置在 Header 工具栏最右侧）
+			// 设置按钮（打开设置中心标签页，置于最右）
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				btn := material.IconButton(u.theme, &u.settingsBtn, iconSettings, "设置")
-				if u.showSettings {
-					btn.Background = CAccent
-					btn.Color = COnAccent
-				} else {
-					btn.Background = CBtnBG
-					btn.Color = CBtnFG
-				}
+				btn.Background = CBtnBG
+				btn.Color = CBtnFG
 				btn.Size = unit.Dp(18)
 				btn.Inset = layout.UniformInset(unit.Dp(7))
 				return btn.Layout(gtx)
@@ -178,13 +121,8 @@ func (u *UI) LayoutTopBar(gtx layout.Context) layout.Dimensions {
 }
 
 // submitAddress 归一化地址栏输入并导航，随后把焦点交还页面。
+// 活跃标签为设置中心时，模型层会忽略导航（设置页不承载网页）。
 func (u *UI) submitAddress(gtx layout.Context) {
-	if u.showSettings || u.showUserscripts || u.showExtensions {
-		u.showSettings = false
-		u.showUserscripts = false
-		u.showExtensions = false
-		u.b.SetSettingsOpen(false)
-	}
 	target := browser.NormalizeInputURL(u.urlEditor.Text())
 	if target == "" {
 		return

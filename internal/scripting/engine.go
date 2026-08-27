@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"gio-browser/internal/browser"
-	"gio-browser/internal/config"
 	"gio-browser/internal/userscript"
 )
 
@@ -118,34 +117,6 @@ func ExecuteAgentAction(b *browser.Browser, action string, params map[string]any
 	case "reload":
 		b.Reload()
 		return "已执行刷新", nil
-
-	case "get_proxy":
-		cfg := config.Current()
-		return map[string]any{
-			"enabled": cfg.ProxyEnabled,
-			"type":    cfg.ProxyType,
-			"server":  cfg.ProxyServer,
-			"bypass":  cfg.ProxyBypass,
-		}, nil
-
-	case "set_proxy":
-		cfg := config.Current()
-		if _, ok := params["enabled"]; ok {
-			cfg.ProxyEnabled = getBool("enabled")
-		}
-		if s := getString("server"); s != "" {
-			cfg.ProxyServer = s
-		}
-		if bp := getString("bypass"); bp != "" {
-			cfg.ProxyBypass = bp
-		}
-		if pt := getString("type"); pt != "" {
-			cfg.ProxyType = pt
-		}
-		if err := config.Save(cfg); err != nil {
-			return nil, fmt.Errorf("保存代理配置失败: %w", err)
-		}
-		return "代理配置已更新并生效", nil
 
 	case "list_userscripts":
 		list := userscript.GetGlobalManager().List()
