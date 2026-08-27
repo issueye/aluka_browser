@@ -2,6 +2,7 @@ package webview
 
 import (
 	"runtime"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -11,6 +12,9 @@ import (
 
 // WM_APP_ACTION 是宿主 STA 线程私有消息，用于唤醒任务队列。
 const WM_APP_ACTION = 0x8000 + 1
+
+// WM_QUIT 请求 GetMessageW 消息循环退出。
+const WM_QUIT = 0x0012
 
 var (
 	procPostThreadMessageW = windows.NewLazySystemDLL("user32.dll").NewProc("PostThreadMessageW")
@@ -50,6 +54,8 @@ func (m *Manager) Start(
 	m.mu.Unlock()
 
 	readyChan := make(chan struct{})
+	stoppedChan := make(chan struct{})
+	var stopOnce sync.Once
 
 	go func() {
 		runtime.LockOSThread()
@@ -62,10 +68,11 @@ func (m *Manager) Start(
 
 		// 宿主窗口需要 WS_CLIPCHILDREN 才能避免子窗口区域闪烁
 		win32.AddWindowStyles(parentHWND, win32.WS_CLIPCHILDREN|win32.WS_CLIPSIBLINGS)
-		// Win11 DWM 原生 8px 圆角
-		win32.EnableNativeRoundCorners(parentHWND)
 
 		close(readyChan)
+
+		// 启动后台标签挂起清理协程（阈值见 suspendAfter）
+		m.startSuspendJanitor()
 
 		// 持续 Win32 消息分发循环
 		var msg msgStruct
@@ -80,9 +87,15 @@ func (m *Manager) Start(
 			procTranslateMessage.Call(uintptr(unsafe.Pointer(&msg)))
 			procDispatchMessageW.Call(uintptr(unsafe.Pointer(&msg)))
 		}
+
+		// 消息循环结束（收到 WM_QUIT），通知等待方
+		stopOnce.Do(func() { close(stoppedChan) })
 	}()
 
 	<-readyChan
+	m.mu.Lock()
+	m.stopped = stoppedChan
+	m.mu.Unlock()
 }
 
 // dispatch 向宿主 STA 线程派发一个任务，立即返回（异步）。

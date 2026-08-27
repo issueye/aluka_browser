@@ -4,6 +4,7 @@ package app
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	gioapp "gioui.org/app"
@@ -13,7 +14,6 @@ import (
 
 	"gio-browser/internal/browser"
 	"gio-browser/internal/config"
-	"gio-browser/internal/scripting"
 	"gio-browser/internal/ui"
 	"gio-browser/internal/webview"
 	"gio-browser/internal/win32"
@@ -43,13 +43,16 @@ func Run() error {
 	b := browser.New(engine)
 	u := ui.New(th, b, win)
 
-	// 初始化 Aluka 脚本与 AI Agent 控制引擎
-	scriptEng, err := scripting.NewEngine(b)
-	if err != nil {
-		log.Printf("[Scripting] 初始化 Aluka 脚本引擎警告: %v", err)
-	} else {
-		log.Printf("[Scripting] Aluka 脚本引擎已就绪，已挂载 browser 与 agent 控制接口")
-		defer scriptEng.Close()
+	// 进程管理浮窗：同一时刻仅允许一个实例
+	var panelOpen atomic.Bool
+	u.OnOpenProcessManager = func() {
+		if !panelOpen.CompareAndSwap(false, true) {
+			return
+		}
+		go func() {
+			defer panelOpen.Store(false)
+			ui.RunProcessPanel(WindowTitle + " · 进程管理")
+		}()
 	}
 
 	startEngineAsync(WindowTitle, engine, b, win)
@@ -58,6 +61,9 @@ func Run() error {
 	for {
 		switch e := win.Event().(type) {
 		case gioapp.DestroyEvent:
+			// 先收尾页面引擎（销毁 WebView2 视图、退出 STA 线程），
+			// 再返回由 main 结束进程
+			engine.Close()
 			return e.Err
 
 		case gioapp.FrameEvent:

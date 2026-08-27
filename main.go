@@ -12,6 +12,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"gio-browser/internal/app"
 )
@@ -19,8 +20,12 @@ import (
 func main() {
 	go func() {
 		if err := app.Run(); err != nil {
-			log.Fatal(err)
+			log.Printf("应用异常退出: %v", err)
+			os.Exit(1)
 		}
+		// gioapp.Main 在 Windows 上不随最后一个窗口关闭而返回；
+		// 此时引擎与窗口均已清理完毕，直接结束进程
+		os.Exit(0)
 	}()
 
 	app.Main()

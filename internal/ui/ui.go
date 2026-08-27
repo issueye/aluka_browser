@@ -59,13 +59,21 @@ type UI struct {
 	goBtn          widget.Clickable
 	settingsBtn    widget.Clickable
 	userscriptsBtn widget.Clickable
+	extensionsBtn  widget.Clickable
+	procBtn        widget.Clickable
 	urlEditor      widget.Editor
 
-	// 设置页面与用户脚本面板状态
+	// OnOpenProcessManager 由装配层注入：点击工具栏进程按钮时打开
+	// 进程管理浮窗（可为 nil，按钮点击则无效果）。
+	OnOpenProcessManager func()
+
+	// 设置页面、用户脚本与扩展面板状态
 	showSettings    bool
 	settings        settingsState
 	showUserscripts bool
 	usUI            userscriptUIState
+	showExtensions  bool
+	extUI           extensionsUIState
 
 	// 动态控件集合
 	tabCtls map[string]*tabCtl
@@ -94,20 +102,15 @@ func New(th *material.Theme, b *browser.Browser, win *app.Window) *UI {
 	}
 	u.initSettingsState()
 	u.initUserscriptsUIState()
+	u.initExtensionsUIState()
 	return u
 }
 
-// LayoutRoot 绘制整窗（圆角裁剪、各区背景、状态栏边框），并返回区域度量，
+// LayoutRoot 绘制整窗（直角窗口、各区背景、外框描边），并返回区域度量，
 // 供 app 层把页面引擎同步到正确矩形。
 func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
-	// 全局 8px 圆角裁剪
-	radius := gtx.Dp(unit.Dp(8))
-	roundClip := clip.RRect{
-		Rect: image.Rectangle{Max: gtx.Constraints.Max},
-		SE:   radius, SW: radius, NE: radius, NW: radius,
-	}
-	stack := roundClip.Push(gtx.Ops)
-
+	// 直角窗口：不做表面圆角裁剪（Win10 无 DWM 原生圆角，
+	// 自绘圆角会在角外露出系统白底，故整体回归直角）
 	paint.FillShape(gtx.Ops, CWindowBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
 
 	var top int
@@ -134,17 +137,20 @@ func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
 			top += dims.Size.Y
 			return dims
 		}),
-		// 页面内容区占位（浏览时 WebView2 覆盖在此之上；打开设置或篡改猴时由 Gio 绘制对应面板）
-		layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
-			if u.showUserscripts {
-				return u.LayoutUserscripts(gtx)
-			}
-			if u.showSettings {
-				return u.LayoutSettings(gtx)
-			}
-			paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
-			return layout.Dimensions{Size: gtx.Constraints.Max}
-		}),
+			// 页面内容区占位（浏览时 WebView2 覆盖在此之上；打开扩展/设置/篡改猴时由 Gio 绘制对应面板）
+			layout.Flexed(1.0, func(gtx layout.Context) layout.Dimensions {
+				if u.showUserscripts {
+					return u.LayoutUserscripts(gtx)
+				}
+				if u.showExtensions {
+					return u.LayoutExtensions(gtx)
+				}
+				if u.showSettings {
+					return u.LayoutSettings(gtx)
+				}
+				paint.FillShape(gtx.Ops, CContentBG, clip.Rect{Max: gtx.Constraints.Max}.Op())
+				return layout.Dimensions{Size: gtx.Constraints.Max}
+			}),
 		layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 			dims := background(gtx, CStatusBG, func(gtx layout.Context) layout.Dimensions {
 				return u.LayoutStatusBar(gtx)
@@ -154,13 +160,18 @@ func (u *UI) LayoutRoot(gtx layout.Context) (m FrameMetrics) {
 		}),
 	)
 
-	// 无边框外围 1px 微质感描边
-	paint.FillShape(gtx.Ops, CBorder, clip.Stroke{
-		Path:  roundClip.Path(gtx.Ops),
-		Width: float32(gtx.Dp(unit.Dp(1))),
-	}.Op())
-
-	stack.Pop()
+	// 无边框外围 1px 微质感描边（直角，四边各一条细矩形）
+	bw := gtx.Dp(unit.Dp(1))
+	max := gtx.Constraints.Max
+	edges := [4]clip.Rect{
+		{Max: image.Point{X: max.X, Y: bw}},                                                     // 上
+		{Max: image.Point{X: bw, Y: max.Y}},                                                     // 左
+		{Min: image.Point{Y: max.Y - bw}, Max: image.Point{X: max.X, Y: max.Y}},                 // 下
+		{Min: image.Point{X: max.X - bw}, Max: image.Point{X: max.X, Y: max.Y}},                 // 右
+	}
+	for _, e := range edges {
+		paint.FillShape(gtx.Ops, CBorder, e.Op())
+	}
 
 	m.Top = top
 	return m

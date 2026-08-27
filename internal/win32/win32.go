@@ -30,7 +30,6 @@ const (
 var (
 	user32                     = windows.NewLazySystemDLL("user32.dll")
 	kernel32                   = windows.NewLazySystemDLL("kernel32.dll")
-	dwmapi                     = windows.NewLazySystemDLL("dwmapi.dll")
 	procGetWindowThreadProcess = user32.NewProc("GetWindowThreadProcessId")
 	procEnumWindows            = user32.NewProc("EnumWindows")
 	procGetWindowTextW         = user32.NewProc("GetWindowTextW")
@@ -43,7 +42,6 @@ var (
 	procSetWindowPos           = user32.NewProc("SetWindowPos")
 	procShowWindow             = user32.NewProc("ShowWindow")
 	procSetFocus               = user32.NewProc("SetFocus")
-	procDwmSetWindowAttribute  = dwmapi.NewProc("DwmSetWindowAttribute")
 )
 
 type Rect struct {
@@ -95,19 +93,6 @@ func AddWindowStyles(hwnd uintptr, styles uintptr) {
 	}
 	style, _, _ := procGetWindowLongPtrW.Call(hwnd, GWL_STYLE)
 	procSetWindowLongPtrW.Call(hwnd, GWL_STYLE, style|styles)
-}
-
-// EnableNativeRoundCorners 启用 Win11 DWM 原生圆角 (8px)。
-func EnableNativeRoundCorners(hwnd uintptr) {
-	if hwnd == 0 {
-		return
-	}
-	const (
-		DWMWA_WINDOW_CORNER_PREFERENCE = 33
-		DWMWCP_ROUND                   = 2
-	)
-	preference := uint32(DWMWCP_ROUND)
-	procDwmSetWindowAttribute.Call(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, uintptr(unsafe.Pointer(&preference)), 4)
 }
 
 // CreateStaticChild 在父窗口客户区坐标处创建 STATIC 子容器窗口。

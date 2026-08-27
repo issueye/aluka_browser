@@ -47,7 +47,7 @@ func (u *UI) LayoutStatusBar(gtx layout.Context) layout.Dimensions {
 					}),
 					layout.Rigid(spacer(4)),
 					layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-						lbl := material.Label(u.theme, unit.Sp(11), "无边框 8px 圆角 · 多标签独立存活")
+						lbl := material.Label(u.theme, unit.Sp(11), "无边框 · 多标签独立存活")
 						lbl.Color = CAccentGreen
 						return lbl.Layout(gtx)
 					}),
