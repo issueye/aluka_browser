@@ -1,19 +1,22 @@
-# Aluka Browser (gio-browser)
+# Gio Browser (gio-browser)
 
-基于 **Gio UI** 与 **Microsoft WebView2** 的无边框多标签桌面浏览器（仅 Windows）。内置篡改猴（Tampermonkey）风格的用户脚本系统，并集成 **Aluka 脚本引擎**，提供面向自动化与 AI Agent Tool Calling 的浏览器控制接口。
+基于 **Gio UI** 与 **Microsoft WebView2** 的无边框多标签桌面浏览器（仅 Windows）。内置篡改猴（Tampermonkey）风格的用户脚本系统，并提供面向 AI Agent Tool Calling 的结构化动作分发层。
 
 窗口标题栏、标签栏、工具栏、书签栏、状态栏、设置页等界面由 Gio 直接绘制（纯 GPU 渲染），网页内容则由每个标签页独享的原生 WebView2 实例承载，两层通过 Win32 子窗口无缝拼合。
 
 ## 功能特性
 
-- **无边框自绘窗口**：macOS 风格红绿灯按钮、8px 圆角裁剪 + Win11 DWM 原生圆角、拖拽移动。
+- **无边框自绘窗口**：macOS 风格红绿灯按钮、直角外观、拖拽移动。
 - **多标签页**：每个标签页拥有独立的 WebView2 渲染实例，后台标签只隐藏不销毁——保留运行状态与滚动位置，切换零成本重载。
 - **地址栏智能归一化**：自动补全协议、识别 `host:port`，非网址输入转为 DuckDuckGo 搜索。
 - **新窗口拦截**：`window.open`、`target=_blank`、中键/Ctrl+点击均被拦截转为新标签页。
 - **快捷书签栏**：内置 GitHub / Google / Bilibili / MDN / HackerNews。
 - **网络代理设置**：支持 HTTP / SOCKS5 代理及白名单绕过，通过 Chromium 启动参数全局生效。
 - **用户脚本管理器**：类篡改猴体验——元数据解析、URL 匹配、启停开关、在线编辑、本地持久化，并预置三个实用脚本（暗黑模式 / 解除复制限制 / 回到顶部悬浮球）。
-- **Aluka 脚本引擎 + Agent 接口**：向 JavaScript 注入 `browser` / `userscript` / `agent` 全局对象，可用于自动化脚本或对接大模型的 Function Calling。
+- **扩展系统（开发者模式）**：参考 Chrome/Edge 的"加载已解压扩展"——解析 manifest.json（MV2/MV3）、content_scripts 自动注入、chrome.runtime/storage 最小兼容沙箱、扩展管理面板。
+- **进程管理浮窗**：独立置顶小窗展示全系统进程树（父子缩进、内存占用、按名过滤、2s 自动刷新），高亮浏览器自身子树（含各标签的 msedgewebview2 进程族），子树内支持一键结束进程。
+- **后台标签内存优化**：后台标签切走时即停止渲染活动；空闲超过阈值后自动对浏览器进程树做工作集裁剪，实测多标签场景物理内存可压缩 **-85%**（3 标签 559MB → 190MB），切回标签页面按需恢复、状态无损。阈值可用环境变量 `GIO_SUSPEND_AFTER_SEC`（秒，默认 180）调节；`GIO_SUSPEND_MODE=api` 可切换为实验性的 TrySuspendAsync 挂起路径（部分运行时版本存在崩溃问题，见 AGENTS.md）。
+- **Agent 动作分发层**：16 个结构化动作（导航/标签/代理/用户脚本管理），纯 Go 实现，可直接对接大模型 Function Calling 或自动化编排，无需嵌入任何脚本运行时。
 
 ## 架构
 
@@ -37,10 +40,10 @@
 │ 交互回调模型方法      · 专有 STA 线程 + Win32       │
 │                       消息循环，dispatch 序列化    │
 │ internal/win32      Win32 API 封装（子窗口/焦点/  │
-│                     圆角/图标/HWND 探测）           │
+│                     图标/HWND 探测）               │
 ├──────────────────────────────────────────────────┤
-│ internal/scripting   Aluka 引擎桥接（browser/     │
-│                      userscript/agent 宿主对象）   │
+│ internal/scripting   Agent 动作分发器：将结构化    │
+│                      指令转发到各领域模型           │
 │ internal/userscript  UserScript 解析/匹配/GM_*    │
 │                      沙箱/JSON 存储                 │
 │ internal/config      配置持久化 + 代理环境变量      │
@@ -66,7 +69,9 @@ internal/
 ├── app/                       应用装配、事件循环、应用图标
 ├── browser/                   标签页状态机、Engine 接口、URL 归一化
 ├── config/                    配置持久化（%APPDATA%）、代理参数生成
-├── scripting/                 Aluka 引擎封装、宿主对象注册、Agent 动作分发
+├── scripting/                 Agent 动作分发器（纯 Go，无运行时依赖）
+├── extension/                 Chrome/Edge 式扩展：manifest/注册表/注入/chrome.* 沙箱
+├── procs/                     进程快照与树构建（纯逻辑，可独立测试）
 ├── ui/                        标签栏/工具栏/书签栏/状态栏/设置页/脚本面板
 ├── userscript/                元数据解析、@match 匹配算法、GM_* 沙箱、存储
 ├── webview/                   WebView2 多标签引擎、STA 宿主线程、注入脚本
@@ -80,13 +85,8 @@ internal/
 - **Windows 10 及以上**
 - **Go 1.25+**
 - **Microsoft Edge WebView2 Runtime**（Win11 一般自带，缺失时从 [微软官网](https://developer.microsoft.com/microsoft-edge/webview2/) 安装）
-- **Aluka 语言源码**：`go.mod` 通过 `replace` 将 `github.com/aluka-lang/aluka` 指向本地目录：
 
-  ```
-  E:/codes/go_projects/aluka_lang/aluka_lang
-  ```
-
-  克隆 aluka 仓库到上述路径（或自行修改 replace 指向你的本地检出位置），否则 `scripting` 与 `app` 包无法编译。
+无本地路径依赖，克隆后即可直接构建：
 
 ```bash
 git clone <本仓库>
@@ -97,7 +97,7 @@ go build -o gio-browser.exe .
 
 ### 构建脚本
 
-仓库内置一键构建脚本，自动完成**环境检查（Go、aluka 引擎本地源码）→ 单元测试 → 构建**三步，任一环节失败即中止并给出修复指引：
+仓库内置一键构建脚本，自动完成**环境检查 → 单元测试 → 构建**三步，任一环节失败即中止并给出修复指引：
 
 ```bash
 ./build.sh          # Git Bash / Linux
@@ -124,7 +124,7 @@ build.bat           # Windows CMD
 go test ./...
 ```
 
-> 若本机不存在 Aluka 本地路径，`app` / `scripting` 两个包的测试会因模块解析失败而无法执行；其余包（browser / config / userscript / ui）可独立通过。
+所有包均可在 Windows 环境独立构建与测试，无需额外检出任何外部仓库。
 
 ## 配置与数据存储
 
@@ -161,43 +161,44 @@ go test ./...
 - **注入时机**：当前固定在页面导航完成（NavigationCompleted）时注入，`@run-at` 已解析但尚未严格区分时机。
 - **沙箱 GM_* API**：`GM_info`、`GM_addStyle`、`GM_setValue/getValue/deleteValue/listValues`（基于 localStorage 的脚本级命名空间持久化）、`GM_log`、`GM_setClipboard`、`GM_registerMenuCommand`、`unsafeWindow`。
 
-## 脚本 / Agent 宿主 API
+## 扩展系统（开发者模式）
 
-Aluka 引擎全局对象一览（可在 Eval / RunFile / 自动化脚本中使用）：
+工具栏拼贴图标按钮打开扩展管理面板，输入已解压扩展的目录路径即可加载（不复制文件，指向源目录；同一目录重复加载视为更新）：
 
-```js
-// —— browser ——
-browser.createTab(url, title?)
-browser.switchTab(index)
-browser.closeTab(index)
-browser.navigate(url)
-browser.goBack() / goForward() / reload()
-browser.eval(jsCode)          // 在当前活跃网页内执行 JS
-browser.setStatus(text)
-browser.getTabs()             // [{index,id,title,url,active}]
-browser.getActiveTab()
-browser.getProxy() / setProxy(enabled, server?, bypass?, type?)
+| 能力 | v1 支持范围 |
+|---|---|
+| manifest 解析 | MV2 / MV3；`name`、`version`、`description`、`permissions`（仅展示）、`icons`（未渲染） |
+| content_scripts | `matches` / `exclude_matches`（复用用户脚本匹配算法）/ `js` / `css`；`run_at` 仅解析、注入固定在页面导航完成时 |
+| chrome.* 沙箱 | `runtime.sendMessage/getManifest/onMessage(空)`、`storage.local|sync`（localStorage 持久化，Promise 风格）、`i18n.getMessage(透传)`；以局部变量遮蔽，不污染页面原生 `window.chrome` |
+| 工具按钮 | `action` / `browser_action` 的 `default_popup` 以新标签页打开 |
+| background | **未实现**（service worker / 事件页不加载） |
 
-// —— userscript ——
-userscript.list()             // [{id,name,version,...,enabled,code}]
-const id = userscript.add(code, enabled?)   // 按 @name 元数据去重更新
-userscript.toggle(id)
-userscript.remove(id)
+扩展 ID 由源目录路径派生（8 位十六进制，同目录恒定）；注册表持久化于 `%APPDATA%\gio-browser\extensions\extensions.json`，移除扩展不会删除源目录。
 
-// —— agent（结构化动作分发，适合 Tool Calling）——
-agent.action('open_url',    { url })
-agent.action('create_tab',  { url, title })
-agent.action('switch_tab',  { index })
-agent.action('close_tab',   { index })
-agent.action('get_tabs')
-agent.action('page_eval',   { script })
-agent.action('go_back' | 'go_forward' | 'reload')
-agent.action('get_proxy' | 'set_proxy', {...})
-agent.action('list_userscript' | 'add_userscript' | 'toggle_userscript' | 'delete_userscript', {...})
-agent.log(...args)
+## Agent 动作分发接口
+
+`scripting.ExecuteAgentAction(browser, action, params)` 是面向 AI Agent / Tool Calling 的唯一结构化入口，动作名大小写不敏感：
+
+| 动作 | 参数 | 说明 |
+|---|---|---|
+| `open_url` / `navigate` | `url` | 当前活跃标签导航 |
+| `create_tab` / `new_tab` | `url`, `title?` | 新建并激活标签页 |
+| `switch_tab` / `close_tab` | `index` | 切换 / 关闭指定下标 |
+| `get_tabs` / `list_tabs` | — | 全部标签信息（含 active 标记） |
+| `page_eval` / `eval_js` | `script` | 在当前网页内执行 JavaScript |
+| `go_back` / `go_forward` / `reload` | — | 导航控制 |
+| `get_proxy` / `set_proxy` | `enabled/server/bypass/type` | 代理查询与配置 |
+| `list_userscripts` / `add_userscript` / `toggle_userscript` / `delete_userscript` | 见源码 | 用户脚本管理 |
+
+Go 调用示例：
+
+```go
+res, err := scripting.ExecuteAgentAction(b, "create_tab", map[string]any{
+	"url": "https://example.com", "title": "示例",
+})
 ```
 
-`ScriptEngine.ExecuteAgentAction(name, params)` 同时暴露为 Go 方法，可作为宿主程序接入 LLM 的动作层。
+该层为纯 Go 实现，无脚本运行时依赖；接入大模型编排时为其挂上本地 IPC/HTTP 入口即可。
 
 ## 当前已知限制
 
@@ -206,6 +207,7 @@ agent.log(...args)
 - 关闭最后一个标签页会回到主页而非退出应用（强制保留至少一个标签）。
 - `@run-at` 与 `GM_registerMenuCommand` 尚未完全实现语义。
 - 各标签页共用同一个 WebView2 数据目录（临时目录下的 `gio_browser_profile`）。
+- 曾集成的 Aluka 脚本运行时已移除：上游将其实现收敛进 internal 包且未提供公共嵌入 API；现仅保留纯 Go 的 Agent 动作分发层。
 
 ## License
 
