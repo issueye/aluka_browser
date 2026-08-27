@@ -62,21 +62,6 @@ log "$(go version)"
 GO_REQUIRED="$(awk '/^go /{print $2}' go.mod)"
 log "go.mod 要求 Go >= ${GO_REQUIRED%.*}"
 
-# 从 go.mod 解析 aluka 引擎的本地 replace 路径（构建必需）
-ALUKA_DIR="$(grep -m1 'github.com/aluka-lang/aluka =>' go.mod | awk '{print $NF}' || true)"
-if [ -z "$ALUKA_DIR" ]; then
-	err "go.mod 中未找到 github.com/aluka-lang/aluka 的 replace 配置，无法定位脚本引擎源码。"
-	exit 1
-fi
-if [ ! -d "$ALUKA_DIR" ]; then
-	err "aluka 脚本引擎本地源码不存在: $ALUKA_DIR"
-	err "解决方式二选一："
-	err "  1) 将 aluka 语言仓库检出到该路径；"
-	err "  2) 修改 go.mod 的 replace 段落，指向你本地的 aluka 检出位置。"
-	exit 1
-fi
-ok "aluka 引擎源码就绪: $ALUKA_DIR"
-
 # 主机平台判定：非 Windows 主机走交叉编译路径
 CROSS=0
 HOST_OS="$(go env GOOS)"

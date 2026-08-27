@@ -48,11 +48,6 @@ rem ---- Environment checks ----
 where go >nul 2>nul || goto :err_no_go
 for /f "delims=" %%v in ('go version') do echo [build] %%v
 
-for /f "tokens=3" %%p in ('findstr /c:"github.com/aluka-lang/aluka =>" go.mod') do set "ALUKA_DIR=%%p"
-if not defined ALUKA_DIR goto :err_aluka_cfg
-if not exist "%ALUKA_DIR%\" goto :err_aluka_missing
-echo [OK] aluka engine sources ready: %ALUKA_DIR%
-
 rem ---- Unit tests ----
 if "%TEST_ONLY%"=="1" goto :run_tests
 if not "%RUN_TEST%"=="1" (
@@ -104,17 +99,6 @@ exit /b 0
 
 :err_no_go
 echo [ERROR] "go" command not found. Install Go 1.25+ from https://go.dev/dl/
-exit /b 1
-
-:err_aluka_cfg
-echo [ERROR] Missing replace entry for github.com/aluka-lang/aluka in go.mod.
-exit /b 1
-
-:err_aluka_missing
-echo [ERROR] aluka engine local sources not found: %ALUKA_DIR%
-echo [ERROR] Fix it either way below:
-echo        1. Clone the aluka language repo into that path; or
-echo        2. Edit the replace block in go.mod to point at your local checkout.
 exit /b 1
 
 :err_test
